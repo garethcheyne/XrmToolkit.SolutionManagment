@@ -2,7 +2,7 @@ using System.Windows.Forms;
 
 namespace err403.SolutionManagment
 {
-    partial class SolutionTransferTool
+    partial class SolutionManagement
     {
         /// <summary> 
         /// Required variable for the designer.
@@ -44,7 +44,7 @@ namespace err403.SolutionManagment
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SolutionTransferTool));
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SolutionManagement));
             this.tsMain = new System.Windows.Forms.ToolStrip();
             this.tsbLoadSolutions = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
@@ -485,7 +485,7 @@ namespace err403.SolutionManagment
             this.dpMain.Size = new System.Drawing.Size(1372, 737);
             this.dpMain.TabIndex = 1;
             // 
-            // SolutionTransferTool
+            // SolutionManagement
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -493,9 +493,9 @@ namespace err403.SolutionManagment
             this.Controls.Add(this.scOrganizations);
             this.Controls.Add(this.tsMain);
             this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
-            this.Name = "SolutionTransferTool";
+            this.Name = "SolutionManagement";
             this.Size = new System.Drawing.Size(1372, 836);
-            this.Resize += new System.EventHandler(this.SolutionTransferTool_Resize);
+            this.Resize += new System.EventHandler(this.SolutionManagement_Resize);
             this.tsMain.ResumeLayout(false);
             this.tsMain.PerformLayout();
             this.scOrganizations.Panel1.ResumeLayout(false);

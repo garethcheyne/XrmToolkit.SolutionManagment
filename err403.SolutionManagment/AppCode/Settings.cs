@@ -257,7 +257,7 @@ Upgrade: Install a new version of the solution and remove missing components")]
 
         public void Save(string name = null)
         {
-            SettingsManager.Instance.Save(typeof(SolutionTransferTool), this, name);
+            SettingsManager.Instance.Save(typeof(SolutionManagement), this, name);
         }
     }
 }

@@ -29,7 +29,7 @@ using Settings = err403.SolutionManagment.AppCode.Settings;
 
 namespace err403.SolutionManagment
 {
-    public partial class SolutionTransferTool : MultipleConnectionsPluginControlBase, IGitHubPlugin, IHelpPlugin
+    public partial class SolutionManagement : MultipleConnectionsPluginControlBase, IGitHubPlugin, IHelpPlugin
     {
         #region Variables
 
@@ -58,7 +58,7 @@ namespace err403.SolutionManagment
 
         #region Constructor
 
-        public SolutionTransferTool()
+        public SolutionManagement()
         {
             InitializeComponent();
 
@@ -480,8 +480,8 @@ namespace err403.SolutionManagment
 
         #region XrmToolbox
 
-        public string HelpUrl => "https://github.com/garethcheyne/SolutionTransferTool/wiki";
-        public string RepositoryName => "SolutionTransferTool";
+        public string HelpUrl => "https://github.com/garethcheyne/SolutionManagement/wiki";
+        public string RepositoryName => "SolutionManagement";
 
         public string UserName => "garethcheyne";
 
@@ -3235,7 +3235,7 @@ Would you like to open the log file now?
             timer.Start();
         }
 
-        private void SolutionTransferTool_Resize(object sender, EventArgs e)
+        private void SolutionManagement_Resize(object sender, EventArgs e)
         {
             // Update splitter distance based on source label width
             if (lblSource != null && scOrganizations != null)

@@ -16,7 +16,7 @@ namespace err403.SolutionManagment
     {
         public override IXrmToolBoxPluginControl GetControl()
         {
-            return new SolutionTransferTool();
+            return new SolutionManagement();
         }
     }
 }
