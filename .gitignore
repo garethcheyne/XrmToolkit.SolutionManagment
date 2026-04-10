@@ -234,4 +234,11 @@ _Pvt_Extensions
 
 # FAKE - F# Make
 .fake/
+
+# VS Code
+.vscode/
+
+# Claude
+.claude/
+
 /MigrationBackup/06cca823/DamSim.SolutionTransferTool
