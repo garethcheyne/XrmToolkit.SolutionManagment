@@ -83,9 +83,7 @@
     <Compile Include="AppCode\Enumerations.cs" />
     <Compile Include="AppCode\Settings.cs" />
     <Compile Include="AppCode\SolutionHelper.cs" />
-    <Compile Include="AppCode\TargetOrganizations.cs" />
     <Compile Include="AppCode\TargetOrganizationsEventArgs.cs" />
-    <Compile Include="AppCode\UpdateVersionEnumConverter.cs" />
     <Compile Include="AppCode\VersionTypeConverter.cs" />
     <None Include="err403.SolutionManagment.nuspec" />
     <Compile Include="Forms\CustomFolderBrowserDialog.cs">
@@ -99,12 +97,6 @@
     </Compile>
     <Compile Include="Forms\EnvironmentVariablesForm.Designer.cs">
       <DependentUpon>EnvironmentVariablesForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Forms\EditEnvironmentVariableForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\EditEnvironmentVariableForm.Designer.cs">
-      <DependentUpon>EditEnvironmentVariableForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Forms\EnvVarEditPanel.cs">
       <SubType>Form</SubType>
@@ -208,9 +200,6 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\EnvironmentVariablesForm.resx">
       <DependentUpon>EnvironmentVariablesForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Forms\EditEnvironmentVariableForm.resx">
-      <DependentUpon>EditEnvironmentVariableForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>

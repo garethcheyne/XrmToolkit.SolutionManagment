@@ -53,7 +53,7 @@ namespace err403.SolutionManagment
         private Dictionary<int, string> solutionComponentTypes = new Dictionary<int, string>();
         private ConnectionDetail sourceDetail;
         private IOrganizationService sourceService;
-        private System.Timers.Timer timer = new System.Timers.Timer();
+        private System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         private List<BaseToProcess> toProcessList = new List<BaseToProcess>();
 
         #endregion Variables
@@ -552,7 +552,7 @@ namespace err403.SolutionManagment
 
         public override void ClosingPlugin(PluginCloseInfo info)
         {
-            if (ConnectionDetail == null) return;
+            if (ConnectionDetail == null || settings == null) return;
 
             settings.Save(ConnectionDetail?.ConnectionName);
 
@@ -776,9 +776,9 @@ namespace err403.SolutionManagment
 
                 ToggleWaitMode(true);
 
-                timer.Elapsed -= Timer_Elapsed;
-                timer.Elapsed += Timer_Elapsed;
-                timer.Interval = (oneTimeSettings ?? settings).RefreshIntervalProp.TotalMilliseconds;
+                timer.Tick -= Timer_Elapsed;
+                timer.Tick += Timer_Elapsed;
+                timer.Interval = (int)(oneTimeSettings ?? settings).RefreshIntervalProp.TotalMilliseconds;
                 timer.Start();
             }
         }
@@ -1252,23 +1252,23 @@ New version: {computedNewVersion}",
 
             StartExport(toProcessList.OfType<ExportToProcess>().First());
 
-            timer.Elapsed -= Timer_Elapsed;
-            timer.Elapsed += Timer_Elapsed;
-            timer.Interval = (oneTimeSettings ?? settings).RefreshIntervalProp.TotalMilliseconds;
+            timer.Tick -= Timer_Elapsed;
+            timer.Tick += Timer_Elapsed;
+            timer.Interval = (int)(oneTimeSettings ?? settings).RefreshIntervalProp.TotalMilliseconds;
             timer.Start();
         }
 
         private void DownloadLogFile(Guid importJobId, IOrganizationService service)
         {
-            var dialog = new FolderBrowserDialog();
-
-            if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.LastFolderUsed))
-                dialog.SelectedPath = Properties.Settings.Default.LastFolderUsed;
-
-            if (dialog.ShowDialog() == DialogResult.OK)
+            using (var dialog = new FolderBrowserDialog())
             {
-                Properties.Settings.Default.LastFolderUsed = dialog.SelectedPath;
-                Properties.Settings.Default.Save();
+                if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.LastFolderUsed))
+                    dialog.SelectedPath = Properties.Settings.Default.LastFolderUsed;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    Properties.Settings.Default.LastFolderUsed = dialog.SelectedPath;
+                    Properties.Settings.Default.Save();
 
                 ToggleWaitMode(true);
 
@@ -1315,6 +1315,7 @@ Would you like to open the file now ({e.Result})?
                         ToggleWaitMode(false);
                     }
                 });
+                }
             }
         }
 
@@ -1326,7 +1327,7 @@ Would you like to open the file now ({e.Result})?
             {
                 int i = 0;
                 var newVersion = DateTime.Now.ToString(oneTimeSettings?.VersionDateMask ?? settings.VersionDateMask).Replace("x", i.ToString());
-                while (new Version(newVersion) <= new Version(version))
+                while (new Version(newVersion) <= new Version(version) && i < 1000)
                 {
                     i++;
                     newVersion = DateTime.Now.ToString(oneTimeSettings?.VersionDateMask ?? settings.VersionDateMask).Replace("x", i.ToString());
@@ -2101,7 +2102,7 @@ Would you like to open the file now ({e.Result})?
             });
         }
 
-        private void Timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private void Timer_Elapsed(object sender, EventArgs e)
         {
             if (cancelPending)
             {
@@ -2591,9 +2592,9 @@ Would you like to open the file now ({e.Result})?
 
             ToggleWaitMode(true);
 
-            timer.Elapsed -= Timer_Elapsed;
-            timer.Elapsed += Timer_Elapsed;
-            timer.Interval = (oneTimeSettings ?? settings).RefreshIntervalProp.TotalMilliseconds;
+            timer.Tick -= Timer_Elapsed;
+            timer.Tick += Timer_Elapsed;
+            timer.Interval = (int)(oneTimeSettings ?? settings).RefreshIntervalProp.TotalMilliseconds;
             timer.Start();
         }
 
@@ -2713,9 +2714,9 @@ Would you like to open the file now ({e.Result})?
 
                 StartExport(toProcessList.OfType<ExportToProcess>().First());
 
-                timer.Elapsed -= Timer_Elapsed;
-                timer.Elapsed += Timer_Elapsed;
-                timer.Interval = settings.RefreshIntervalProp.TotalMilliseconds;
+                timer.Tick -= Timer_Elapsed;
+                timer.Tick += Timer_Elapsed;
+                timer.Interval = (int)settings.RefreshIntervalProp.TotalMilliseconds;
                 timer.Start();
 
                 return;

@@ -15,9 +15,17 @@ namespace err403.SolutionManagment
         /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing)
             {
-                components.Dispose();
+                timer?.Stop();
+                timer?.Dispose();
+                mForm?.Close();
+                evForm?.Close();
+                cfForm?.Close();
+                pForm?.Close();
+                evEditPanel?.Close();
+                sForm?.Close();
+                components?.Dispose();
             }
             base.Dispose(disposing);
         }

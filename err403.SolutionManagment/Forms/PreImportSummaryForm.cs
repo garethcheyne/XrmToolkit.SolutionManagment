@@ -79,6 +79,7 @@ namespace err403.SolutionManagment.Forms
 
         private void tsbDown_Click(object sender, EventArgs e)
         {
+            if (lvSolutions.SelectedItems.Count == 0) return;
             if (lvSolutions.SelectedItems[0].Index == lvSolutions.Items.Count - 1)
                 return;
 
@@ -90,6 +91,7 @@ namespace err403.SolutionManagment.Forms
 
         private void tsbUp_Click(object sender, EventArgs e)
         {
+            if (lvSolutions.SelectedItems.Count == 0) return;
             if (lvSolutions.SelectedItems[0].Index == 0)
                 return;
 

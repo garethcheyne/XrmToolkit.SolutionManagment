@@ -81,7 +81,7 @@ namespace err403.SolutionManagment
                         writer.WriteLine("Required Component,Schema Name,Id,Type,Solution");
                         foreach (ListViewItem item in lvMissingComponents.Items)
                         {
-                            writer.WriteLine($"{item.SubItems[0].Text},{item.SubItems[1].Text},{item.SubItems[2].Text},{item.SubItems[3].Text},{item.SubItems[4].Text}");
+                            writer.WriteLine($"{CsvEscape(item.SubItems[0].Text)},{CsvEscape(item.SubItems[1].Text)},{CsvEscape(item.SubItems[2].Text)},{CsvEscape(item.SubItems[3].Text)},{CsvEscape(item.SubItems[4].Text)}");
                         }
                     }
 
@@ -91,6 +91,17 @@ namespace err403.SolutionManagment
                     }
                 }
             }
+        }
+
+        private static string CsvEscape(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            // Strip leading formula-injection characters
+            while (value.Length > 0 && (value[0] == '=' || value[0] == '+' || value[0] == '-' || value[0] == '@'))
+                value = value.Substring(1);
+            if (value.Contains(",") || value.Contains("\"") || value.Contains("\n"))
+                return "\"" + value.Replace("\"", "\"\"") + "\"";
+            return value;
         }
 
         private void btnMaximize_Click(object sender, EventArgs e)

@@ -185,15 +185,17 @@ namespace err403.SolutionManagment
                     return;
                 }
 
-                var sfd = new SaveFileDialog
+                using (var sfd = new SaveFileDialog
                 {
                     Filter = @"Zip file (*.zip)|*.zip",
                     FileName = $"{esr.SolutionName}_{SolutionVersion.Replace(".", "_")}{(esr.Managed ? "_managed" : "")}.zip"
-                };
-                if (sfd.ShowDialog(Parent) == DialogResult.OK)
+                })
                 {
-                    File.WriteAllBytes(sfd.FileName, this.SolutionFile);
-                    MessageBox.Show(Parent, $@"File saved to {sfd.FileName}", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    if (sfd.ShowDialog(Parent) == DialogResult.OK)
+                    {
+                        File.WriteAllBytes(sfd.FileName, this.SolutionFile);
+                        MessageBox.Show(Parent, $@"File saved to {sfd.FileName}", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                 }
             }
         }

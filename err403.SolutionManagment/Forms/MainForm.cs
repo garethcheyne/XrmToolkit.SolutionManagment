@@ -358,9 +358,10 @@ namespace err403.SolutionManagment.Forms
 
         private void lstSourceSolutions_KeyDown(Object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Enter && lstSourceSolutions.SelectedItems.Count > 0)
+            if (e.KeyCode == Keys.Enter && lstSourceSolutions.SelectedItems.Count > 0 && !string.IsNullOrEmpty(solutionUrlBase))
             {
-                Process.Start(solutionUrlBase + $"/tools/solution/edit.aspx?id={lstSourceSolutions.SelectedItems[0].Tag}");
+                var entity = (Entity)lstSourceSolutions.SelectedItems[0].Tag;
+                Process.Start(solutionUrlBase + $"/tools/solution/edit.aspx?id={entity.Id}");
             }
         }
 
@@ -423,7 +424,7 @@ namespace err403.SolutionManagment.Forms
                         subItem.ForeColor = Color.Black;
                         subItem.Text = "-";
                     }
-                    else if (subItem.Text == item.SubItems[2].Text)
+                    else if (subItem.Text.Replace("(M) ", "").Replace("(U) ", "") == item.SubItems[2].Text)
                     {
                         subItem.BackColor = Color.LightGreen;
                         subItem.ForeColor = Color.DarkGreen;

@@ -78,11 +78,17 @@ namespace err403.SolutionManagment
 
             var innerDataXml = new XmlDocument();
 
-            var resultParams = dataxml["importexportxml"]["solutionManifests"]["solutionManifest"]["result"]["parameters"];
+            var resultParams = dataxml["importexportxml"]?["solutionManifests"]?["solutionManifest"]?["result"]?["parameters"];
 
             if (resultParams == null)
             {
                 MessageBox.Show(@"The solution import did not failed because of missing dependencies", "No missing dependencies", MessageBoxButtons.OK);
+                return;
+            }
+
+            if (resultParams.ChildNodes.Count < 2 || resultParams.ChildNodes[1].ChildNodes.Count == 0 || resultParams.ChildNodes[1].ChildNodes[0].Value == null)
+            {
+                MessageBox.Show(@"Could not parse the missing dependency details from the import log.", "Parse Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             innerDataXml.LoadXml(resultParams.ChildNodes[1].ChildNodes[0].Value);

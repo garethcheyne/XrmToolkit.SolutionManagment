@@ -8,19 +8,6 @@ namespace err403.SolutionManagment.AppCode
 {
     internal static class SolutionHelper
     {
-        public static bool CheckForNewConnectionReferences(string solutionUniqueName, IOrganizationService sourceService, IOrganizationService targetService)
-        {
-            var sourceConnectionReferences = GetConnectionReferences(solutionUniqueName, sourceService);
-            var targetConnectionReferences = GetConnectionReferences(solutionUniqueName, targetService);
-
-            if (sourceConnectionReferences.Any(scr => targetConnectionReferences.All(tcr => tcr.GetAttributeValue<string>("connectionreferencelogicalname") != scr.GetAttributeValue<string>("connectionreferencelogicalname"))))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
         public static List<string> CheckForNewConnectionReferences(List<Guid> solutionIds, IOrganizationService targetService, Dictionary<Guid, List<ConnectionReferenceInfo>> cris)
         {
             var crs = cris.Where(c => solutionIds.Contains(c.Key)).SelectMany(c => c.Value).Select(c => c.LogicalName).ToList();

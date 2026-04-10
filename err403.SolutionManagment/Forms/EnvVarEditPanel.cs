@@ -10,6 +10,13 @@ using WeifenLuo.WinFormsUI.Docking;
 
 namespace err403.SolutionManagment.Forms
 {
+    public class TargetVariableInfo
+    {
+        public ConnectionDetail Detail { get; set; }
+        public string Value { get; set; }
+        public bool Exists { get; set; }
+    }
+
     public class EnvVarEditPanel : DockContent
     {
         private Panel pnlHeader;
