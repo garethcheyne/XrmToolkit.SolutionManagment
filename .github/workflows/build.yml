@@ -1,0 +1,59 @@
+name: Build Solution
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  BuildSolution:
+    runs-on: windows-latest
+
+    env:
+      ToolName: 'err403.SolutionManagment'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+        with:
+          nuget-version: '6.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: NuGet restore
+        run: nuget restore
+
+      - name: Build solution
+        run: msbuild /p:Platform="Any CPU" /p:Configuration=Release
+
+      - name: Get Assembly version
+        id: assembly_version
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem -Recurse -Filter "${{ env.ToolName }}.dll" -Path . | Where-Object { $_.DirectoryName -match 'bin[\\/]Release' } | Select-Object -First 1
+          if ($dll) {
+            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($dll.FullName).FileVersion
+          } else {
+            # Fallback: read from AssemblyInfo.cs
+            $assemblyInfo = Get-ChildItem -Recurse -Filter "AssemblyInfo.cs" | Select-Object -First 1
+            $content = Get-Content $assemblyInfo.FullName -Raw
+            if ($content -match 'AssemblyVersion\("([^"]+)"\)') {
+              $version = $Matches[1]
+            }
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Assembly version: $version"
+
+      - name: Create NuGet package
+        run: nuget pack $(Get-ChildItem -Recurse -Filter "*.nuspec" | Select-Object -First 1 -ExpandProperty FullName) -Version ${{ steps.assembly_version.outputs.VERSION }} -OutputDirectory ${{ github.workspace }}/artifacts
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: drop
+          path: ${{ github.workspace }}/artifacts/**/*.nupkg

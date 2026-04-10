@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug XrmToolBox Plugin",
+            "type": "clr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "C:\\APPS\\XRMTOOLBOX\\XrmToolBox.exe",
+            "args": [
+                "/plugin:Solution Management"
+            ],
+            "cwd": "C:\\APPS\\XRMTOOLBOX",
+            "console": "internalConsole"
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command ':*)",
+      "Bash(powershell -Command \"[Convert]::ToBase64String\\([IO.File]::ReadAllBytes\\('c:/Apps/Projects/XrmToolBox/Solutions/DamSim.SolutionTransferTool/codesigning.pfx'\\)\\) | Set-Clipboard; Write-Host 'Base64 copied to clipboard!'\")"
+    ]
+  }
+}
