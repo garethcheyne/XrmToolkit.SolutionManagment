@@ -3,18 +3,18 @@
   <metadata>
     <id>err403.SolutionManagment</id>
     <version>1.2026.4.10</version>
-    <title>Solution Transfer Tool (err403) for XrmToolBox</title>
+    <title>Solution Management (err403) for XrmToolBox</title>
     <authors>err403</authors>
     <owners>err403</owners>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <projectUrl>https://github.com/garethcheyne/SolutionTransferTool</projectUrl>
-    <iconUrl>https://raw.githubusercontent.com/garethcheyne/SolutionTransferTool/main/err403.SolutionManagment/Resources/Icon.png</iconUrl>
-    <description>Transfer solutions across organizations</description>
-    <summary>Transfer solutions across organizations</summary>
+    <projectUrl>https://github.com/garethcheyne/XrmToolkit.SolutionManagment</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/garethcheyne/XrmToolkit.SolutionManagment/master/err403.SolutionManagment/Resources/Icon.png</iconUrl>
+    <description>Transfer solutions, manage environment variables, and activate/deactivate cloud flows across Dataverse organisations.</description>
+    <summary>Solution, environment variable, and cloud flow management across Dataverse environments.</summary>
     <releaseNotes>
-      Added possibility to cancel a solution import flow
+      Cloud Flows tab, Environment Variables tab, managed/unmanaged warnings, docked UI.
     </releaseNotes>
-    <tags>XrmToolBox Solutions Transfer</tags>
+    <tags>XrmToolBox Solutions Transfer EnvironmentVariables CloudFlows Dataverse</tags>
     <dependencies>
       <dependency id="XrmToolBox" version="1.2018.7.28" />
     </dependencies>
