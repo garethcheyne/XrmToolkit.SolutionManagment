@@ -163,6 +163,16 @@ namespace err403.SolutionManagment.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap PowerAppsLogo {
+            get {
+                object obj = ResourceManager.GetObject("PowerAppsLogo", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap icons8_cancel {
             get {
                 object obj = ResourceManager.GetObject("icons8-cancel", resourceCulture);

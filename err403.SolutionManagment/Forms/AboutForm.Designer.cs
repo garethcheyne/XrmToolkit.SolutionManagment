@@ -20,6 +20,8 @@ namespace err403.SolutionManagment.Forms
             this.tabControl = new System.Windows.Forms.TabControl();
             this.tabAbout = new System.Windows.Forms.TabPage();
             this.tabImprovements = new System.Windows.Forms.TabPage();
+            this.tabPowerPlatform = new System.Windows.Forms.TabPage();
+            this.wbPowerPlatform = new System.Windows.Forms.WebBrowser();
             this.lblTitle = new System.Windows.Forms.Label();
             this.lblVersion = new System.Windows.Forms.Label();
             this.lblDescription = new System.Windows.Forms.Label();
@@ -35,6 +37,7 @@ namespace err403.SolutionManagment.Forms
             this.tabControl.SuspendLayout();
             this.tabAbout.SuspendLayout();
             this.tabImprovements.SuspendLayout();
+            this.tabPowerPlatform.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).BeginInit();
             this.SuspendLayout();
             // 
@@ -45,6 +48,7 @@ namespace err403.SolutionManagment.Forms
             | System.Windows.Forms.AnchorStyles.Right)));
             this.tabControl.Controls.Add(this.tabAbout);
             this.tabControl.Controls.Add(this.tabImprovements);
+            this.tabControl.Controls.Add(this.tabPowerPlatform);
             this.tabControl.Location = new System.Drawing.Point(12, 12);
             this.tabControl.Name = "tabControl";
             this.tabControl.SelectedIndex = 0;
@@ -204,6 +208,28 @@ namespace err403.SolutionManagment.Forms
             this.wbChangelog.AllowNavigation = false;
             this.wbChangelog.ScriptErrorsSuppressed = true;
             // 
+            // tabPowerPlatform
+            // 
+            this.tabPowerPlatform.Controls.Add(this.wbPowerPlatform);
+            this.tabPowerPlatform.Location = new System.Drawing.Point(4, 25);
+            this.tabPowerPlatform.Name = "tabPowerPlatform";
+            this.tabPowerPlatform.Padding = new System.Windows.Forms.Padding(0);
+            this.tabPowerPlatform.Size = new System.Drawing.Size(688, 361);
+            this.tabPowerPlatform.TabIndex = 2;
+            this.tabPowerPlatform.Text = "Power Platform Auth";
+            this.tabPowerPlatform.UseVisualStyleBackColor = true;
+            // 
+            // wbPowerPlatform
+            // 
+            this.wbPowerPlatform.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.wbPowerPlatform.Location = new System.Drawing.Point(0, 0);
+            this.wbPowerPlatform.Name = "wbPowerPlatform";
+            this.wbPowerPlatform.Size = new System.Drawing.Size(688, 361);
+            this.wbPowerPlatform.TabIndex = 0;
+            this.wbPowerPlatform.IsWebBrowserContextMenuEnabled = false;
+            this.wbPowerPlatform.AllowNavigation = false;
+            this.wbPowerPlatform.ScriptErrorsSuppressed = true;
+            // 
             // btnClose
             // 
             this.btnClose.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
@@ -237,6 +263,7 @@ namespace err403.SolutionManagment.Forms
             this.tabAbout.ResumeLayout(false);
             this.tabAbout.PerformLayout();
             this.tabImprovements.ResumeLayout(false);
+            this.tabPowerPlatform.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox)).EndInit();
             this.ResumeLayout(false);
         }
@@ -258,5 +285,7 @@ namespace err403.SolutionManagment.Forms
         private System.Windows.Forms.WebBrowser wbChangelog;
         private System.Windows.Forms.Button btnClose;
         private System.Windows.Forms.PictureBox pictureBox;
+        private System.Windows.Forms.TabPage tabPowerPlatform;
+        private System.Windows.Forms.WebBrowser wbPowerPlatform;
     }
 }

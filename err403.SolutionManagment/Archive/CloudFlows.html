@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f8f9fa;
+    --border: #e1e5e9;
+    --text: #1a1a2e;
+    --text-secondary: #64748b;
+    --accent: #6366f1;
+    --accent-light: #eef2ff;
+    --success-bg: #dcfce7;
+    --success-fg: #166534;
+    --warning-bg: #fef9c3;
+    --warning-fg: #854d0e;
+    --error-bg: #fce4ec;
+    --error-fg: #b71c1c;
+    --neutral-bg: #f1f5f9;
+    --neutral-fg: #475569;
+    --hover: #f1f5f9;
+    --selected: #e0e7ff;
+    --radius: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .search-box {
+    flex: 1;
+    max-width: 320px;
+    position: relative;
+  }
+
+  .search-box svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    width: 14px;
+    height: 14px;
+  }
+
+  .search-box input {
+    width: 100%;
+    padding: 6px 10px 6px 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    background: var(--bg);
+  }
+
+  .search-box input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filter-group label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  select {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+    background: var(--bg);
+    outline: none;
+    cursor: pointer;
+  }
+
+  select:focus {
+    border-color: var(--accent);
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .toggle input { display: none; }
+
+  .toggle-track {
+    width: 32px;
+    height: 18px;
+    background: var(--border);
+    border-radius: 9px;
+    position: relative;
+    transition: background 0.2s;
+  }
+
+  .toggle input:checked + .toggle-track {
+    background: var(--accent);
+  }
+
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+
+  .toggle input:checked + .toggle-track::after {
+    transform: translateX(14px);
+  }
+
+  .count-badge {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--neutral-bg);
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  /* Grid */
+  .grid-container {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  thead th {
+    background: var(--surface);
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  thead th:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  thead th .sort-icon {
+    display: inline-block;
+    margin-left: 4px;
+    opacity: 0.3;
+    font-size: 10px;
+  }
+
+  thead th.sorted .sort-icon {
+    opacity: 1;
+    color: var(--accent);
+  }
+
+  thead th.target-col {
+    background: var(--accent-light);
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  tbody tr:hover {
+    background: var(--hover);
+  }
+
+  tbody tr.selected {
+    background: var(--selected);
+  }
+
+  tbody td {
+    padding: 7px 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 350px;
+  }
+
+  /* Status pills */
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .status-pill::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .status-on {
+    background: var(--success-bg);
+    color: var(--success-fg);
+  }
+  .status-on::before { background: var(--success-fg); }
+
+  .status-off {
+    background: var(--neutral-bg);
+    color: var(--neutral-fg);
+  }
+  .status-off::before { background: var(--neutral-fg); }
+
+  .status-suspended {
+    background: var(--warning-bg);
+    color: var(--warning-fg);
+  }
+  .status-suspended::before { background: var(--warning-fg); }
+
+  .status-notfound {
+    background: var(--neutral-bg);
+    color: var(--neutral-fg);
+    font-style: italic;
+    opacity: 0.7;
+  }
+  .status-notfound::before { display: none; }
+
+  .status-error {
+    background: var(--error-bg);
+    color: var(--error-fg);
+  }
+  .status-error::before { background: var(--error-fg); }
+
+  /* Target match/mismatch */
+  td.match { color: var(--success-fg); }
+  td.mismatch { color: var(--error-fg); }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+    gap: 8px;
+  }
+
+  .empty-state svg {
+    width: 48px;
+    height: 48px;
+    color: var(--border);
+    margin-bottom: 8px;
+  }
+
+  .empty-state h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* Context menu */
+  .context-menu {
+    display: none;
+    position: fixed;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    z-index: 100;
+    padding: 4px 0;
+    min-width: 180px;
+  }
+
+  .context-menu.visible {
+    display: block;
+  }
+
+  .context-menu-item {
+    padding: 7px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .context-menu-item:hover {
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+
+  .context-menu-item.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search flows...">
+    </div>
+    <div class="filter-group">
+      <label>Solution:</label>
+      <select id="solutionFilter"><option value="">(All)</option></select>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="activeOnly">
+      <span class="toggle-track"></span>
+      Active only
+    </label>
+    <span class="count-badge" id="countBadge">0 flows</span>
+  </div>
+
+  <div class="grid-container" id="gridContainer">
+    <table>
+      <thead id="gridHead">
+        <tr>
+          <th data-col="name" class="sorted">Flow Name <span class="sort-icon">&#9650;</span></th>
+          <th data-col="type">Type <span class="sort-icon">&#9650;</span></th>
+          <th data-col="status">Status <span class="sort-icon">&#9650;</span></th>
+          <th data-col="solution">Solution <span class="sort-icon">&#9650;</span></th>
+          <th data-col="owner">Owner <span class="sort-icon">&#9650;</span></th>
+          <th data-col="modifiedOn">Modified <span class="sort-icon">&#9650;</span></th>
+        </tr>
+      </thead>
+      <tbody id="gridBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
+        <polyline points="13 2 13 9 20 9"/>
+      </svg>
+      <h3>No cloud flows found</h3>
+      <p>Connect to a source environment and load solutions first.</p>
+    </div>
+  </div>
+
+  <div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" data-action="openInMaker">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+      Open in Power Automate
+    </div>
+  </div>
+
+<script>
+  // ── State ──
+  let allFlows = [];
+  let targetColumns = [];  // [{name, connectionName}]
+  let selectedRows = new Set();
+  let sortCol = 'name';
+  let sortAsc = true;
+  let lastClickedRow = null;
+  let contextTarget = null;  // {flowIndex, columnName}
+
+  // ── Bridge helpers ──
+  function postMessage(action, data) {
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage(JSON.stringify({ action, ...data }));
+    }
+  }
+
+  // ── Called from C# ──
+  window.loadFlows = function(flowsJson) {
+    allFlows = JSON.parse(flowsJson);
+    selectedRows.clear();
+
+    // Populate solution filter
+    const solutions = [...new Set(allFlows.map(f => f.solution).filter(Boolean))].sort();
+    const sel = document.getElementById('solutionFilter');
+    sel.innerHTML = '<option value="">(All)</option>';
+    solutions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s;
+      sel.appendChild(opt);
+    });
+
+    render();
+  };
+
+  window.addTargetColumn = function(connectionName) {
+    if (targetColumns.find(c => c.connectionName === connectionName)) return;
+    targetColumns.push({ connectionName });
+    rebuildHeaders();
+    render();
+  };
+
+  window.setTargetFlowStatus = function(connectionName, flowsJson) {
+    const targetFlows = JSON.parse(flowsJson);
+    allFlows.forEach(f => {
+      if (!f.targets) f.targets = {};
+      const match = targetFlows.find(tf => tf.name === f.name);
+      if (match) {
+        f.targets[connectionName] = {
+          status: match.status,
+          stateCode: match.stateCode,
+          statusCode: match.statusCode
+        };
+      } else {
+        f.targets[connectionName] = { status: 'notfound', stateCode: -1 };
+      }
+    });
+    render();
+  };
+
+  window.removeTargetColumn = function(connectionName) {
+    targetColumns = targetColumns.filter(c => c.connectionName !== connectionName);
+    allFlows.forEach(f => { if (f.targets) delete f.targets[connectionName]; });
+    rebuildHeaders();
+    render();
+  };
+
+  window.updateFlowCellStatus = function(connectionName, flowName, newStatus, isMatch, isError, errorWarning) {
+    const flow = allFlows.find(f => f.name === flowName);
+    if (!flow) return;
+    if (!flow.targets) flow.targets = {};
+    flow.targets[connectionName] = {
+      status: newStatus,
+      stateCode: newStatus === 'On' ? 1 : 0,
+      isMatch: isMatch,
+      isError: isError,
+      errorWarning: errorWarning || ''
+    };
+    render();
+  };
+
+  window.getSelectedFlows = function() {
+    const filtered = getFilteredFlows();
+    const selected = filtered.filter((_, i) => selectedRows.has(i));
+    return JSON.stringify(selected.map(f => ({
+      name: f.name,
+      workflowId: f.workflowId,
+      stateCode: f.stateCode
+    })));
+  };
+
+  // ── Filtering & Sorting ──
+  function getFilteredFlows() {
+    let flows = allFlows.slice();
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const solFilter = document.getElementById('solutionFilter').value;
+    const activeOnly = document.getElementById('activeOnly').checked;
+
+    if (activeOnly) {
+      flows = flows.filter(f => f.stateCode === 1);
+    }
+    if (solFilter) {
+      flows = flows.filter(f => f.solution === solFilter);
+    }
+    if (search) {
+      flows = flows.filter(f => {
+        const searchable = [f.name, f.type, f.status, f.solution, f.owner].join(' ').toLowerCase();
+        return searchable.includes(search);
+      });
+    }
+
+    flows.sort((a, b) => {
+      let va = a[sortCol] || '';
+      let vb = b[sortCol] || '';
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+
+    return flows;
+  }
+
+  // ── Rendering ──
+  function rebuildHeaders() {
+    const thead = document.getElementById('gridHead');
+    const tr = thead.querySelector('tr');
+    // Remove existing target columns
+    tr.querySelectorAll('.target-col').forEach(th => th.remove());
+
+    const modifiedTh = tr.querySelector('[data-col="modifiedOn"]');
+    targetColumns.forEach(tc => {
+      const th = document.createElement('th');
+      th.className = 'target-col';
+      th.dataset.col = 'target_' + tc.connectionName;
+      th.textContent = tc.connectionName + ' ';
+      const span = document.createElement('span');
+      span.className = 'sort-icon';
+      span.innerHTML = '&#9650;';
+      th.appendChild(span);
+      th.addEventListener('click', () => handleSort(th.dataset.col));
+      tr.insertBefore(th, modifiedTh.nextSibling);
+    });
+  }
+
+  function render() {
+    const flows = getFilteredFlows();
+    const tbody = document.getElementById('gridBody');
+    const empty = document.getElementById('emptyState');
+
+    document.getElementById('countBadge').textContent =
+      `${flows.length} flow${flows.length !== 1 ? 's' : ''}` +
+      (selectedRows.size > 0 ? ` (${selectedRows.size} selected)` : '');
+
+    if (flows.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = allFlows.length === 0 ? 'flex' : 'flex';
+      if (allFlows.length > 0) {
+        empty.querySelector('h3').textContent = 'No matching flows';
+        empty.querySelector('p').textContent = 'Try adjusting your filters.';
+      } else {
+        empty.querySelector('h3').textContent = 'No cloud flows found';
+        empty.querySelector('p').textContent = 'Connect to a source environment and load solutions first.';
+      }
+      return;
+    }
+
+    empty.style.display = 'none';
+
+    const fragment = document.createDocumentFragment();
+    flows.forEach((flow, idx) => {
+      const tr = document.createElement('tr');
+      tr.dataset.index = idx;
+      if (selectedRows.has(idx)) tr.classList.add('selected');
+
+      // Name
+      const tdName = document.createElement('td');
+      tdName.textContent = flow.name;
+      tdName.title = flow.name;
+      tr.appendChild(tdName);
+
+      // Type
+      const tdType = document.createElement('td');
+      tdType.textContent = flow.type;
+      tr.appendChild(tdType);
+
+      // Status
+      const tdStatus = document.createElement('td');
+      tdStatus.innerHTML = statusPill(flow.status, flow.stateCode);
+      tr.appendChild(tdStatus);
+
+      // Solution
+      const tdSol = document.createElement('td');
+      tdSol.textContent = flow.solution;
+      tdSol.title = flow.solution;
+      tr.appendChild(tdSol);
+
+      // Owner
+      const tdOwner = document.createElement('td');
+      tdOwner.textContent = flow.owner;
+      tr.appendChild(tdOwner);
+
+      // Modified
+      const tdMod = document.createElement('td');
+      tdMod.textContent = flow.modifiedOn;
+      tr.appendChild(tdMod);
+
+      // Target columns
+      targetColumns.forEach(tc => {
+        const tdTarget = document.createElement('td');
+        const t = flow.targets && flow.targets[tc.connectionName];
+        if (!t || t.stateCode === -1) {
+          tdTarget.innerHTML = '<span class="status-pill status-notfound">not found</span>';
+        } else if (t.isError) {
+          tdTarget.innerHTML = statusPill(t.status + (t.errorWarning ? ' \u26a0' : ''), -2);
+        } else {
+          tdTarget.innerHTML = statusPill(t.status, t.stateCode);
+          if (t.isMatch === true) tdTarget.classList.add('match');
+          else if (t.isMatch === false) tdTarget.classList.add('mismatch');
+          else {
+            // Auto-determine match from state codes
+            if (t.stateCode === flow.stateCode) tdTarget.classList.add('match');
+            else tdTarget.classList.add('mismatch');
+          }
+        }
+        tr.appendChild(tdTarget);
+      });
+
+      // Events
+      tr.addEventListener('click', e => handleRowClick(e, idx));
+      tr.addEventListener('contextmenu', e => handleContextMenu(e, flow, idx));
+      tr.addEventListener('dblclick', () => {
+        selectedRows.clear();
+        selectedRows.add(idx);
+        render();
+        postMessage('activate');
+      });
+
+      fragment.appendChild(tr);
+    });
+
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+  }
+
+  function statusPill(text, stateCode) {
+    let cls = 'status-off';
+    if (stateCode === 1) cls = 'status-on';
+    else if (stateCode === 2) cls = 'status-suspended';
+    else if (stateCode === -1) cls = 'status-notfound';
+    else if (stateCode === -2) cls = 'status-error';
+    return `<span class="status-pill ${cls}">${escapeHtml(text)}</span>`;
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ── Interaction ──
+  function handleSort(col) {
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortCol = col;
+      sortAsc = true;
+    }
+
+    document.querySelectorAll('#gridHead th').forEach(th => {
+      th.classList.toggle('sorted', th.dataset.col === col);
+      const icon = th.querySelector('.sort-icon');
+      if (icon) icon.innerHTML = (th.dataset.col === col && !sortAsc) ? '&#9660;' : '&#9650;';
+    });
+
+    render();
+  }
+
+  function handleRowClick(e, idx) {
+    if (e.ctrlKey || e.metaKey) {
+      if (selectedRows.has(idx)) selectedRows.delete(idx);
+      else selectedRows.add(idx);
+    } else if (e.shiftKey && lastClickedRow !== null) {
+      const start = Math.min(lastClickedRow, idx);
+      const end = Math.max(lastClickedRow, idx);
+      for (let i = start; i <= end; i++) selectedRows.add(i);
+    } else {
+      selectedRows.clear();
+      selectedRows.add(idx);
+    }
+    lastClickedRow = idx;
+    render();
+  }
+
+  function handleContextMenu(e, flow, idx) {
+    e.preventDefault();
+    if (!selectedRows.has(idx)) {
+      selectedRows.clear();
+      selectedRows.add(idx);
+      render();
+    }
+
+    // Figure out which column was clicked
+    const td = e.target.closest('td');
+    const tr = td?.parentElement;
+    let colIdx = td ? Array.from(tr.children).indexOf(td) : -1;
+    let connectionName = null;
+
+    // Check if it's a target column (index >= 6 means it's after the core columns)
+    if (colIdx >= 6 && colIdx - 6 < targetColumns.length) {
+      connectionName = targetColumns[colIdx - 6].connectionName;
+    }
+
+    contextTarget = { flowIndex: idx, connectionName: connectionName };
+
+    const menu = document.getElementById('contextMenu');
+    menu.style.left = e.clientX + 'px';
+    menu.style.top = e.clientY + 'px';
+    menu.classList.add('visible');
+  }
+
+  // Close context menu on click elsewhere
+  document.addEventListener('click', () => {
+    document.getElementById('contextMenu').classList.remove('visible');
+  });
+
+  // Context menu actions
+  document.querySelector('[data-action="openInMaker"]').addEventListener('click', () => {
+    const flows = getFilteredFlows();
+    const selected = [...selectedRows].map(i => flows[i]).filter(Boolean);
+    postMessage('openInMaker', {
+      flowIds: selected.map(f => f.workflowId),
+      connectionName: contextTarget?.connectionName
+    });
+  });
+
+  // Sort header clicks
+  document.querySelectorAll('#gridHead th').forEach(th => {
+    if (th.dataset.col) {
+      th.addEventListener('click', () => handleSort(th.dataset.col));
+    }
+  });
+
+  // Filter events
+  document.getElementById('searchInput').addEventListener('input', () => {
+    selectedRows.clear();
+    render();
+  });
+  document.getElementById('solutionFilter').addEventListener('change', () => {
+    selectedRows.clear();
+    render();
+  });
+  document.getElementById('activeOnly').addEventListener('change', () => {
+    selectedRows.clear();
+    render();
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const flows = getFilteredFlows();
+      selectedRows = new Set(flows.map((_, i) => i));
+      render();
+    }
+    if (e.key === 'Escape') {
+      selectedRows.clear();
+      render();
+    }
+  });
+
+  // Initial render
+  render();
+</script>
+</body>
+</html>

@@ -33,14 +33,12 @@ namespace err403.SolutionManagment
     {
         #region Variables
 
-        private readonly MainForm mForm;
-        private readonly ProgressForm pForm;
-        private readonly EnvironmentVariablesForm evForm;
-        private readonly CloudFlowsForm cfForm;
-        private readonly EnvVarEditPanel evEditPanel;
+        private readonly WebUIHost cfForm;
         private bool envVarsLoaded;
         private bool flowsLoaded;
+        private bool orgSettingsLoaded;
         private bool cancelPending;
+        private bool isPolling;
         private Dictionary<Guid, List<ConnectionReferenceInfo>> connectionReferencesBySolution = new Dictionary<Guid, List<ConnectionReferenceInfo>>();
         private string lastConnectionName;
         private Guid lastImportId;
@@ -49,12 +47,12 @@ namespace err403.SolutionManagment
         private Settings oneTimeSettings;
         private Dictionary<OrganizationRequest, ProgressItem> progressItems;
         private Settings settings;
-        private SettingsForm sForm;
         private Dictionary<int, string> solutionComponentTypes = new Dictionary<int, string>();
         private ConnectionDetail sourceDetail;
         private IOrganizationService sourceService;
         private System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
         private List<BaseToProcess> toProcessList = new List<BaseToProcess>();
+        private List<Entity> currentSolutions = new List<Entity>();
 
         #endregion Variables
 
@@ -64,42 +62,51 @@ namespace err403.SolutionManagment
         {
             InitializeComponent();
 
-            dpMain.Theme = new VS2015LightTheme();
+            // Remove legacy WinForms UI — React replaces everything
+            Controls.Remove(dpMain);
+            Controls.Remove(scOrganizations);
+            tsMain.Visible = false;
 
-            mForm = new MainForm();
-            mForm.gbTargetOrgs = gbTargetOrgs;
-            mForm.lblSource = lblSource;
-            mForm.scOrganizations = scOrganizations;
-            mForm.TargetOrganizationRemoved += MForm_TargetOrganizationRemoved;
-            mForm.TargetOrganizationRequested += MForm_TargetOrganizationRequested;
-            mForm.Show(dpMain, DockState.Document);
-
-            evForm = new EnvironmentVariablesForm();
-            evForm.EditRequested += EvForm_EditRequested;
-            evForm.TransferRequested += EvForm_TransferRequested;
-            evForm.RefreshRequested += EvForm_RefreshRequested;
-            evForm.Show(dpMain, DockState.Document);
-
-            cfForm = new CloudFlowsForm();
+            // WebUIHost fills the entire area below the toolbar
+            cfForm = new WebUIHost();
+            // Cloud Flows
             cfForm.RefreshRequested += CfForm_RefreshRequested;
             cfForm.ActivateRequested += CfForm_ActivateRequested;
             cfForm.DeactivateRequested += CfForm_DeactivateRequested;
-            cfForm.Show(dpMain, DockState.Document);
+            // Solutions
+            cfForm.LoadSolutionsRequested += (s, ev) => ExecuteMethod(RetrieveSolutions);
+            cfForm.TransferSolutionsRequested += CfForm_TransferSolutionsRequested;
+            cfForm.ImportFromFileRequested += (s, ev) => tsbImportFromFile_Click(s, ev);
+            cfForm.ExportSolutionsRequested += CfForm_ExportSolutionsRequested;
+            cfForm.RemoveFromTargetsRequested += CfForm_RemoveFromTargetsRequested;
+            cfForm.SwitchOrgsRequested += (s, ev) => tsbSwitchOrgs_Click(s, ev);
+            cfForm.FindMissingDepsRequested += (s, ev) => tsbFindMissingDependencies_Click(s, ev);
+            cfForm.OpenSolutionInMakerRequested += CfForm_OpenSolutionInMakerRequested;
+            // Environment Variables
+            cfForm.RefreshEnvVarsRequested += (s, ev) => { envVarsLoaded = false; RetrieveEnvironmentVariables(); envVarsLoaded = true; };
+            cfForm.EditEnvVarRequested += CfForm_EditEnvVarRequested;
+            cfForm.SaveEnvVarRequested += CfForm_SaveEnvVarRequested;
+            cfForm.TransferEnvVarsRequested += CfForm_TransferEnvVarsRequested;
+            // Platform Settings
+            cfForm.RefreshSettingsRequested += (s, ev) => { orgSettingsLoaded = false; RetrieveOrgSettings(); orgSettingsLoaded = true; };
+            cfForm.SyncSettingsRequested += CfForm_SyncSettingsRequested;
+            // Navigation & connections
+            cfForm.TabChanged += CfForm_TabChanged;
+            cfForm.AddTargetRequested += CfForm_AddTargetRequested;
+            cfForm.RemoveTargetRequested += CfForm_RemoveTargetRequested;
+            cfForm.RetryRequested += PForm_OnRetry;
+            cfForm.RefreshTokenRequested += (s, ev) =>
+            {
+                if (sourceDetail == null) return;
+                var svc = sourceDetail.GetCrmServiceClient();
+                var orgUrl = svc?.CrmConnectOrgUriActual?.GetLeftPart(UriPartial.Authority)?.TrimEnd('/') ?? sourceDetail.WebApplicationUrl?.TrimEnd('/');
+                var token = svc?.CurrentAccessToken ?? "";
+                var envId = ResolveEnvironmentId(sourceDetail, svc) ?? "";
+                cfForm.SetAuthContext(orgUrl, token, envId);
+            };
+            Controls.Add(cfForm);
 
-            pForm = new ProgressForm();
-            pForm.OnRetry += PForm_OnRetry;
-            pForm.Show(dpMain, DockState.DockRight);
-
-            evEditPanel = new EnvVarEditPanel();
-            evEditPanel.SaveRequested += EvEditPanel_SaveRequested;
-            evEditPanel.Show(dpMain, DockState.DockRight);
-
-            sForm = new SettingsForm();
-            sForm.Show(dpMain, DockState.DockRight);
-
-            dpMain.ActiveDocumentChanged += DpMain_ActiveDocumentChanged;
-
-            mForm.Activate();
+            UpdateGdsAuthButton();
 
             ToastNotificationManagerCompat.OnActivated += toastArgs =>
             {
@@ -163,43 +170,12 @@ namespace err403.SolutionManagment
 
         #region Forms events callback
 
-        private void DpMain_ActiveDocumentChanged(object sender, EventArgs e)
+        private void CfForm_TabChanged(object sender, Forms.TabChangedEventArgs e)
         {
-            bool isEnvTab = dpMain.ActiveDocument == evForm;
-            bool isFlowTab = dpMain.ActiveDocument == cfForm;
-            bool isSolutionTab = !isEnvTab && !isFlowTab;
-
-            // Right panels
-            if (isEnvTab)
-            {
-                sForm.Hide();
-                pForm.Hide();
-                evEditPanel.Show(dpMain, WeifenLuo.WinFormsUI.Docking.DockState.DockRight);
-
-                if (!envVarsLoaded && sourceService != null)
-                {
-                    envVarsLoaded = true;
-                    RetrieveEnvironmentVariables();
-                }
-            }
-            else if (isFlowTab)
-            {
-                sForm.Hide();
-                pForm.Hide();
-                evEditPanel.Hide();
-
-                if (!flowsLoaded && sourceService != null)
-                {
-                    flowsLoaded = true;
-                    RetrieveCloudFlows();
-                }
-            }
-            else
-            {
-                evEditPanel.Hide();
-                pForm.Show(dpMain, WeifenLuo.WinFormsUI.Docking.DockState.DockRight);
-                sForm.Show(dpMain, WeifenLuo.WinFormsUI.Docking.DockState.DockRight);
-            }
+            bool isFlowTab = e.Tab == "flows";
+            bool isEnvTab = e.Tab == "envvars";
+            bool isOrgSettingsTab = e.Tab == "settings";
+            bool isSolutionTab = e.Tab == "solutions";
 
             // Solution-specific buttons
             tsbLoadSolutions.Visible = isSolutionTab;
@@ -226,75 +202,97 @@ namespace err403.SolutionManagment
             tsbRefreshFlows.Visible = isFlowTab;
             tsbActivateFlows.Visible = isFlowTab;
             tsbDeactivateFlows.Visible = isFlowTab;
+
+            // Org Settings buttons
+            tsbSettingsSeparator.Visible = isOrgSettingsTab;
+            tsbRefreshSettings.Visible = isOrgSettingsTab;
+            tsbSyncSelectedSettings.Visible = isOrgSettingsTab;
+            tsbSyncAllSettings.Visible = isOrgSettingsTab;
+
+            // Right panels
+            if (isFlowTab && !flowsLoaded && sourceService != null)
+            {
+                flowsLoaded = true;
+                RetrieveCloudFlows();
+            }
+            if (isEnvTab && !envVarsLoaded && sourceService != null)
+            {
+                envVarsLoaded = true;
+                RetrieveEnvironmentVariables();
+            }
+            if (isOrgSettingsTab && !orgSettingsLoaded && sourceService != null)
+            {
+                orgSettingsLoaded = true;
+                RetrieveOrgSettings();
+            }
+
         }
 
-        private void EvForm_EditRequested(object sender, Forms.EnvVarEditRequestedEventArgs e)
+        private void CfForm_AddTargetRequested(object sender, EventArgs e)
         {
-            if (!AdditionalConnectionDetails.Any())
+            AddAdditionalOrganization();
+        }
+
+        private void CfForm_RemoveTargetRequested(object sender, Forms.RemoveTargetEventArgs e)
+        {
+            var toRemove = AdditionalConnectionDetails.FirstOrDefault(c => c.ConnectionName == e.ConnectionName);
+            if (toRemove == null) return;
+
+            cfForm.RemoveTargetColumn(toRemove);
+            RemoveAdditionalOrganization(toRemove);
+            cfForm.SetTargets(AdditionalConnectionDetails.Select(c => c.ConnectionName).ToList());
+        }
+
+        // ── Solutions events from React ──
+
+        private void CfForm_TransferSolutionsRequested(object sender, Forms.SolutionActionEventArgs e)
+        {
+            if (e.Solutions == null || e.Solutions.Count == 0 || !AdditionalConnectionDetails.Any()) return;
+            // Map back to Entity objects
+            var entities = e.Solutions.Select(s => currentSolutions.FirstOrDefault(cs => cs.Id.ToString() == s.SolutionId)).Where(x => x != null).ToList();
+            oneTimeSettings = null;
+            DoTransfer();
+        }
+
+        private void CfForm_ExportSolutionsRequested(object sender, Forms.SolutionActionEventArgs e)
+        {
+            if (e.Solutions == null || e.Solutions.Count == 0) return;
+            tsbExportSolutions_Click(sender, EventArgs.Empty);
+        }
+
+        private void CfForm_RemoveFromTargetsRequested(object sender, Forms.SolutionActionEventArgs e)
+        {
+            if (e.Solutions == null || e.Solutions.Count == 0 || !AdditionalConnectionDetails.Any()) return;
+            tsbRemoveFromTargets_Click(sender, EventArgs.Empty);
+        }
+
+        private void CfForm_OpenSolutionInMakerRequested(object sender, Forms.StringEventArgs e)
+        {
+            var srcEnvId = ResolveEnvironmentId(sourceDetail, sourceService);
+            if (string.IsNullOrEmpty(srcEnvId))
             {
-                MessageBox.Show(this, "No target environments connected. Add targets from the Solutions tab first.",
-                    "No Targets", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, "Environment ID not available. Click 'Power Platform Auth' first.",
+                    "Authentication Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-
-            var targets = new List<Forms.TargetVariableInfo>();
-
-            foreach (var cd in AdditionalConnectionDetails)
-            {
-                var col = evForm.LvEnvVars.Columns.Cast<ColumnHeader>()
-                    .FirstOrDefault(c => c.Text == cd.ConnectionName);
-
-                string targetValue = null;
-                bool exists = false;
-
-                if (col != null)
-                {
-                    var subItem = e.Item.SubItems.Cast<ListViewItem.ListViewSubItem>()
-                        .ElementAtOrDefault(col.Index);
-                    if (subItem != null && subItem.Text != "(not found)")
-                    {
-                        targetValue = subItem.Text == "(default)" ? "" : subItem.Text;
-                        exists = true;
-                    }
-                }
-
-                targets.Add(new Forms.TargetVariableInfo
-                {
-                    Detail = cd,
-                    Value = targetValue,
-                    Exists = exists
-                });
-            }
-
-            evEditPanel.LoadVariable(e.DisplayName, e.SchemaName, e.TypeName, e.SourceValue, targets, e.Item);
+            var url = $"https://make.powerapps.com/environments/{srcEnvId}/solutions/{e.Value}";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
         }
 
-        private void EvEditPanel_SaveRequested(object sender, Forms.EnvVarEditSaveEventArgs e)
+        // ── Environment Variable events from React ──
+
+        private void CfForm_EditEnvVarRequested(object sender, Forms.EnvVarEditEventArgs e)
         {
-            if (e.Item == null || !e.ChangedValues.Any()) return;
-
-            var def = (Entity)e.Item.Tag;
-            var schemaName = e.Item.SubItems[1].Text; // colSchemaName index
-            var displayName = e.Item.Text;
-
-            var editArgs = new Forms.EnvVarEditRequestedEventArgs
-            {
-                DisplayName = displayName,
-                SchemaName = schemaName,
-                Item = e.Item,
-                Definition = def
-            };
-
-            SaveEnvironmentVariableChanges(editArgs, e.ChangedValues);
+            // For now, delegate to existing edit panel logic
+            // The edit panel will be ported to React in a future phase
         }
 
-        private void SaveEnvironmentVariableChanges(Forms.EnvVarEditRequestedEventArgs e,
-            Dictionary<McTools.Xrm.Connection.ConnectionDetail, string> changedValues)
+        private void CfForm_SaveEnvVarRequested(object sender, Forms.EnvVarSaveEventArgs e)
         {
-            foreach (var kvp in changedValues)
+            foreach (var kvp in e.ChangedValues)
             {
-                var cd = kvp.Key;
-                var newValue = kvp.Value;
+                var cd = AdditionalConnectionDetails.FirstOrDefault(c => c.ConnectionName == kvp.Key);
+                if (cd == null) continue;
 
                 WorkAsync(new WorkAsyncInfo
                 {
@@ -302,8 +300,6 @@ namespace err403.SolutionManagment
                     Work = (bw, we) =>
                     {
                         var svc = cd.GetCrmServiceClient();
-
-                        // Find the definition on target by schema name
                         var defQuery = new QueryExpression("environmentvariabledefinition")
                         {
                             ColumnSet = new ColumnSet("environmentvariabledefinitionid"),
@@ -319,7 +315,6 @@ namespace err403.SolutionManagment
                         var targetDef = svc.RetrieveMultiple(defQuery).Entities.FirstOrDefault();
                         if (targetDef == null) throw new Exception($"Definition '{e.SchemaName}' not found on {cd.ConnectionName}");
 
-                        // Find existing value record
                         var valQuery = new QueryExpression("environmentvariablevalue")
                         {
                             ColumnSet = new ColumnSet("environmentvariablevalueid"),
@@ -336,209 +331,149 @@ namespace err403.SolutionManagment
 
                         if (existingVal != null)
                         {
-                            existingVal["value"] = newValue;
+                            existingVal["value"] = kvp.Value;
                             svc.Update(existingVal);
                         }
                         else
                         {
                             var newVal = new Entity("environmentvariablevalue")
                             {
-                                ["value"] = newValue,
+                                ["value"] = kvp.Value,
                                 ["environmentvariabledefinitionid"] = new EntityReference("environmentvariabledefinition", targetDef.Id)
                             };
                             svc.Create(newVal);
                         }
-
                         we.Result = cd;
                     },
                     PostWorkCallBack = we =>
                     {
                         if (we.Error != null)
                         {
-                            MessageBox.Show(this,
-                                $"Error updating on {cd.ConnectionName}:\n{we.Error.Message}",
+                            MessageBox.Show(this, $"Error updating on {cd.ConnectionName}:\n{we.Error.Message}",
                                 "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
-                        }
-
-                        // Refresh the target column in the list
-                        var col = evForm.LvEnvVars.Columns.Cast<ColumnHeader>()
-                            .FirstOrDefault(c => c.Text == cd.ConnectionName);
-                        if (col != null)
-                        {
-                            var subItem = e.Item.SubItems.Cast<ListViewItem.ListViewSubItem>()
-                                .ElementAtOrDefault(col.Index);
-                            if (subItem != null)
-                            {
-                                subItem.Text = newValue;
-                                var sourceValue = e.Item.SubItems[evForm.ColCurrentValue.Index].Text;
-                                if (newValue == sourceValue)
-                                {
-                                    subItem.BackColor = Color.LightGreen;
-                                    subItem.ForeColor = Color.DarkGreen;
-                                }
-                                else
-                                {
-                                    subItem.BackColor = SystemColors.Info;
-                                    subItem.ForeColor = Color.DarkRed;
-                                }
-                            }
                         }
                     }
                 });
             }
         }
 
-        private void EvForm_TransferRequested(object sender, Forms.EnvVarTransferRequestedEventArgs e)
+        private void CfForm_TransferEnvVarsRequested(object sender, Forms.EnvVarTransferEventArgs e)
         {
-            if (!AdditionalConnectionDetails.Any())
+            if (e.Items == null || e.Items.Count == 0 || !AdditionalConnectionDetails.Any()) return;
+
+            foreach (var item in e.Items)
             {
-                MessageBox.Show(this, "No target environments connected. Add targets from the Solutions tab first.",
-                    "No Targets", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var targetList = AdditionalConnectionDetails.ToList();
-
-            using (var summary = new Forms.TransferEnvVarSummaryForm(e.Items, targetList))
-            {
-                if (summary.ShowDialog(this) != DialogResult.OK || summary.ConfirmedItems == null) return;
-
-                foreach (var item in summary.ConfirmedItems)
+                foreach (var cd in AdditionalConnectionDetails)
                 {
-                    foreach (var cd in targetList)
+                    WorkAsync(new WorkAsyncInfo
                     {
-                        var sourceValue = item.SourceValue;
-                        var schemaName = item.SchemaName;
-                        var displayName = item.DisplayName;
-                        var listViewItem = item.Item;
-
-                        WorkAsync(new WorkAsyncInfo
+                        Message = $"Transferring \"{item.DisplayName}\" to {cd.ConnectionName}...",
+                        Work = (bw, we) =>
                         {
-                            Message = $"Transferring \"{displayName}\" to {cd.ConnectionName}...",
-                            Work = (bw, we) =>
+                            var svc = cd.GetCrmServiceClient();
+                            var defQuery = new QueryExpression("environmentvariabledefinition")
                             {
-                                var svc = cd.GetCrmServiceClient();
-
-                                var defQuery = new QueryExpression("environmentvariabledefinition")
+                                ColumnSet = new ColumnSet("environmentvariabledefinitionid"),
+                                Criteria = new FilterExpression
                                 {
-                                    ColumnSet = new ColumnSet("environmentvariabledefinitionid"),
-                                    Criteria = new FilterExpression
+                                    Conditions =
                                     {
-                                        Conditions =
-                                        {
-                                            new ConditionExpression("schemaname", ConditionOperator.Equal, schemaName),
-                                            new ConditionExpression("statecode", ConditionOperator.Equal, 0)
-                                        }
+                                        new ConditionExpression("schemaname", ConditionOperator.Equal, item.SchemaName),
+                                        new ConditionExpression("statecode", ConditionOperator.Equal, 0)
                                     }
-                                };
-                                var targetDef = svc.RetrieveMultiple(defQuery).Entities.FirstOrDefault();
-                                if (targetDef == null) throw new Exception($"Definition '{schemaName}' not found on {cd.ConnectionName}");
-
-                                var valQuery = new QueryExpression("environmentvariablevalue")
-                                {
-                                    ColumnSet = new ColumnSet("environmentvariablevalueid"),
-                                    Criteria = new FilterExpression
-                                    {
-                                        Conditions =
-                                        {
-                                            new ConditionExpression("environmentvariabledefinitionid", ConditionOperator.Equal, targetDef.Id),
-                                            new ConditionExpression("statecode", ConditionOperator.Equal, 0)
-                                        }
-                                    }
-                                };
-                                var existingVal = svc.RetrieveMultiple(valQuery).Entities.FirstOrDefault();
-
-                                if (existingVal != null)
-                                {
-                                    existingVal["value"] = sourceValue;
-                                    svc.Update(existingVal);
                                 }
-                                else
-                                {
-                                    var newVal = new Entity("environmentvariablevalue")
-                                    {
-                                        ["value"] = sourceValue,
-                                        ["environmentvariabledefinitionid"] = new EntityReference("environmentvariabledefinition", targetDef.Id)
-                                    };
-                                    svc.Create(newVal);
-                                }
+                            };
+                            var targetDef = svc.RetrieveMultiple(defQuery).Entities.FirstOrDefault();
+                            if (targetDef == null) throw new Exception($"Definition '{item.SchemaName}' not found on {cd.ConnectionName}");
 
-                                we.Result = new Tuple<ConnectionDetail, ListViewItem, string>(cd, listViewItem, sourceValue);
-                            },
-                            PostWorkCallBack = we =>
+                            var valQuery = new QueryExpression("environmentvariablevalue")
                             {
-                                if (we.Error != null)
+                                ColumnSet = new ColumnSet("environmentvariablevalueid"),
+                                Criteria = new FilterExpression
                                 {
-                                    MessageBox.Show(this,
-                                        $"Error transferring \"{displayName}\" to {cd.ConnectionName}:\n{we.Error.Message}",
-                                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                    return;
-                                }
-
-                                var result = (Tuple<ConnectionDetail, ListViewItem, string>)we.Result;
-                                var col = evForm.LvEnvVars.Columns.Cast<ColumnHeader>()
-                                    .FirstOrDefault(c => c.Text == result.Item1.ConnectionName);
-                                if (col != null)
-                                {
-                                    var subItem = result.Item2.SubItems.Cast<ListViewItem.ListViewSubItem>()
-                                        .ElementAtOrDefault(col.Index);
-                                    if (subItem != null)
+                                    Conditions =
                                     {
-                                        subItem.Text = result.Item3;
-                                        subItem.BackColor = Color.LightGreen;
-                                        subItem.ForeColor = Color.DarkGreen;
+                                        new ConditionExpression("environmentvariabledefinitionid", ConditionOperator.Equal, targetDef.Id),
+                                        new ConditionExpression("statecode", ConditionOperator.Equal, 0)
                                     }
                                 }
+                            };
+                            var existingVal = svc.RetrieveMultiple(valQuery).Entities.FirstOrDefault();
+
+                            if (existingVal != null)
+                            {
+                                existingVal["value"] = item.SourceValue;
+                                svc.Update(existingVal);
                             }
-                        });
-                    }
+                            else
+                            {
+                                var newVal = new Entity("environmentvariablevalue")
+                                {
+                                    ["value"] = item.SourceValue,
+                                    ["environmentvariabledefinitionid"] = new EntityReference("environmentvariabledefinition", targetDef.Id)
+                                };
+                                svc.Create(newVal);
+                            }
+                            we.Result = cd;
+                        },
+                        PostWorkCallBack = we =>
+                        {
+                            if (we.Error != null)
+                            {
+                                MessageBox.Show(this, $"Error transferring \"{item.DisplayName}\" to {cd.ConnectionName}:\n{we.Error.Message}",
+                                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                    });
                 }
             }
         }
 
-        private void EvForm_RefreshRequested(object sender, EventArgs e)
-        {
-            if (sourceService == null) return;
-            envVarsLoaded = true;
-            RetrieveEnvironmentVariables();
-        }
+        // ── Platform Settings events from React ──
 
-        private void MForm_TargetOrganizationRemoved(object sender, TargetOrganizationsEventArgs e)
+        private void CfForm_SyncSettingsRequested(object sender, Forms.SettingSyncEventArgs e)
         {
-            var toRemove = AdditionalConnectionDetails.FirstOrDefault(c => !e.TargetOrganizations.Contains(c));
+            if (e.Items == null || e.Items.Count == 0 || !AdditionalConnectionDetails.Any()) return;
 
-            if (toRemove != null)
+            var confirm = MessageBox.Show(this,
+                $"Sync {e.Items.Count} setting(s) to {AdditionalConnectionDetails.Count} target(s)?",
+                "Confirm Sync", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (confirm != DialogResult.Yes) return;
+
+            foreach (var cd in AdditionalConnectionDetails)
             {
-                // Remove the matching column from the env vars list
-                var col = evForm.LvEnvVars.Columns.Cast<ColumnHeader>()
-                    .FirstOrDefault(c => c.Text == toRemove.ConnectionName);
-                if (col != null)
+                WorkAsync(new WorkAsyncInfo
                 {
-                    var idx = col.Index;
-                    evForm.LvEnvVars.Columns.Remove(col);
-                    foreach (ListViewItem item in evForm.LvEnvVars.Items)
+                    Message = $"Syncing settings to {cd.ConnectionName}...",
+                    Work = (bw, we) =>
                     {
-                        if (item.SubItems.Count > idx)
-                            item.SubItems.RemoveAt(idx);
+                        var svc = cd.GetCrmServiceClient();
+                        var query = new QueryExpression("organization") { ColumnSet = new ColumnSet("organizationid") };
+                        var org = svc.RetrieveMultiple(query).Entities.FirstOrDefault();
+                        if (org == null) throw new Exception("Organization not found");
+
+                        foreach (var item in e.Items)
+                        {
+                            org[item.UniqueName] = item.SourceValue;
+                        }
+                        svc.Update(org);
+                        we.Result = cd;
+                    },
+                    PostWorkCallBack = we =>
+                    {
+                        if (we.Error != null)
+                        {
+                            MessageBox.Show(this, $"Error syncing to {cd.ConnectionName}:\n{we.Error.Message}",
+                                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                        else
+                        {
+                            // Refresh target data
+                            DisplayTargetOrgSettingsInReact(new List<ConnectionDetail> { cd });
+                        }
                     }
-                }
-
-                // Remove the matching column from the cloud flows list
-                cfForm.RemoveTargetColumn(toRemove);
+                });
             }
-
-            RemoveAdditionalOrganization(toRemove);
-        }
-
-        private void MForm_TargetOrganizationRequested(object sender, EventArgs e)
-        {
-            AddAdditionalOrganization();
-        }
-
-        private void btnAddTarget_Click(object sender, EventArgs e)
-        {
-            AddAdditionalOrganization();
         }
 
         #endregion Forms events callback
@@ -567,11 +502,14 @@ namespace err403.SolutionManagment
                 {
                     AdditionalConnectionDetails.Add(detail);
 
-                    mForm.DisplayTargetOrganizations(AdditionalConnectionDetails.ToList());
-                    mForm.DisplayTargetOrganizationsSolutions(AdditionalConnectionDetails.ToList(), this);
-                    evForm.DisplayTargetEnvironmentValues(new List<ConnectionDetail> { detail }, this);
-                    if (flowsLoaded)
-                        cfForm.DisplayTargetFlowStatus(new List<ConnectionDetail> { detail }, this);
+                    // Pass target auth context to React
+                    var targetSvc = detail.GetCrmServiceClient();
+                    var targetOrgUrl = targetSvc?.CrmConnectOrgUriActual?.GetLeftPart(UriPartial.Authority)?.TrimEnd('/') ?? detail.WebApplicationUrl?.TrimEnd('/');
+                    var targetToken = targetSvc?.CurrentAccessToken ?? "";
+                    var targetEnvId = ResolveEnvironmentId(detail, targetSvc) ?? "";
+                    cfForm.AddTargetContext(detail.ConnectionName, targetOrgUrl, targetToken, targetEnvId);
+
+
                 }
 
                 if (newService is OrganizationServiceProxy proxy)
@@ -597,8 +535,16 @@ namespace err403.SolutionManagment
                     settings = new Settings();
                 }
 
-                sForm.Settings = settings;
-                mForm.SetSourceOrganization(detail);
+                cfForm.SetSource(detail.ConnectionName);
+
+                // Pass auth context to React for direct Dataverse Web API calls
+                var svc = detail.GetCrmServiceClient();
+                var orgUrl = svc?.CrmConnectOrgUriActual?.GetLeftPart(UriPartial.Authority)?.TrimEnd('/') ?? detail.WebApplicationUrl?.TrimEnd('/');
+                var token = svc?.CurrentAccessToken ?? "";
+                var srcEnvId = ResolveEnvironmentId(detail, newService);
+                cfForm.SetAuthContext(orgUrl, token, srcEnvId ?? "");
+                cfForm.SetSourceEnvironment(srcEnvId);
+
 
                 base.UpdateConnection(newService, detail, actionName, parameter);
             }
@@ -606,7 +552,8 @@ namespace err403.SolutionManagment
 
         protected override void ConnectionDetailsUpdated(NotifyCollectionChangedEventArgs e)
         {
-            mForm.DisplayTargetOrganizations(AdditionalConnectionDetails.ToList());
+
+            cfForm.SetTargets(AdditionalConnectionDetails.Select(c => c.ConnectionName).ToList());
         }
 
         #endregion XrmToolbox
@@ -615,7 +562,26 @@ namespace err403.SolutionManagment
 
         private void Pi_LogFileRequested(object sender, DownloadLogEventArgs e)
         {
-            DownloadLogFile(e.ImportJobId, e.Service);
+            var pi = sender as ProgressItem;
+            DownloadLogFile(e.ImportJobId, e.Service, pi?.AsyncErrorMessage);
+        }
+
+        private void Pi_ViewMessageRequested(object sender, DownloadLogEventArgs e)
+        {
+            var pi = sender as ProgressItem;
+            var solutionName = pi?.Solution;
+
+            // If we have a stored async error message, show it directly
+            if (!string.IsNullOrEmpty(pi?.AsyncErrorMessage))
+            {
+                using (var form = new Forms.ImportLogViewerForm(pi.AsyncErrorMessage, solutionName, true))
+                {
+                    form.ShowDialog(this);
+                }
+                return;
+            }
+
+            ViewImportMessage(e.ImportJobId, e.Service, solutionName);
         }
 
         private void tsbFindMissingDependencies_Click(object sender, EventArgs e)
@@ -651,11 +617,14 @@ namespace err403.SolutionManagment
                 AdditionalConnectionDetails.Add(tempDetail);
             }
 
-            mForm.SwitchSourceAndTarget(tempDetail, sourceDetail);
+
 
             if (sourceDetail != null)
             {
                 sourceService = sourceDetail.GetCrmServiceClient();
+                var srcEnvId = ResolveEnvironmentId(sourceDetail, sourceService);
+                cfForm.SetSourceEnvironment(srcEnvId);
+
                 base.UpdateConnection(sourceService, sourceDetail, "", null);
                 RetrieveSolutions();
             }
@@ -671,19 +640,19 @@ namespace err403.SolutionManagment
 
         private void tsbRefreshEnvVars_Click(object sender, EventArgs e)
         {
-            evForm.InvokeRefresh();
+
         }
 
         private void tsbTransferEnvVars_Click(object sender, EventArgs e)
         {
-            evForm.InvokeTransfer();
+
         }
 
         private void TsbTransfertSolutionClick(object sender, EventArgs e)
         {
             oneTimeSettings = null;
 
-            if (mForm.SelectedSolutions.Count == 0 || !AdditionalConnectionDetails.Any())
+            if (currentSolutions.Count == 0 || !AdditionalConnectionDetails.Any())
             {
                 MessageBox.Show(this, @"You have to select a source solution and a target organization to continue.", @"Warning",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -695,7 +664,7 @@ namespace err403.SolutionManagment
 
         private void tssbTransfer_DropDownItemClicked(object sender, ToolStripItemClickedEventArgs e)
         {
-            if (mForm.SelectedSolutions.Count == 0 || !AdditionalConnectionDetails.Any())
+            if (currentSolutions.Count == 0 || !AdditionalConnectionDetails.Any())
             {
                 MessageBox.Show(this, @"You have to select a source solution and a target organization to continue.", @"Warning",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -770,9 +739,9 @@ namespace err403.SolutionManagment
                     });
                 }
 
-                pForm.Items = progressItems.Values.ToList();
-                pForm.Start();
-                pForm.Show(dpMain, DockState.DockRight);
+            // TODO: port progress to React
+
+
 
                 ToggleWaitMode(true);
 
@@ -785,14 +754,14 @@ namespace err403.SolutionManagment
 
         private void tsbRemoveFromTargets_Click(object sender, EventArgs e)
         {
-            if (mForm.SelectedSolutions.Count == 0 || !AdditionalConnectionDetails.Any())
+            if (currentSolutions.Count == 0 || !AdditionalConnectionDetails.Any())
             {
                 MessageBox.Show(this, @"You have to select a source solution and a target organization to continue.", @"Warning",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            var selectedSolutions = mForm.SelectedSolutions;
+            var selectedSolutions = currentSolutions;
             var targetDetails = AdditionalConnectionDetails.ToList();
 
             var solutionNames = string.Join(", ", selectedSolutions.Select(s => s.GetAttributeValue<string>("friendlyname")));
@@ -832,9 +801,9 @@ Targets: {targetNames}",
                 }
             }
 
-            pForm.Items = removeProgressItems;
-            pForm.Start();
-            pForm.Show(dpMain, WeifenLuo.WinFormsUI.Docking.DockState.DockRight);
+            // TODO: port progress to React
+
+
 
             ToggleWaitMode(true);
 
@@ -928,7 +897,7 @@ Are you sure you want to proceed?",
 
                     var removedCount = (int)evt.Result;
 
-                    mForm.DisplayTargetOrganizationsSolutions(targetDetails, this);
+
 
                     if (removedCount > 0)
                     {
@@ -1011,7 +980,7 @@ Are you sure you want to proceed?",
 
         private void DoTransfer()
         {
-            var solutionsToTransfer = mForm.SelectedSolutions;
+            var solutionsToTransfer = currentSolutions;
             if (!(oneTimeSettings ?? settings).ShowPreImportSummary)
             {
                 solutionsToTransfer = PreparareSolutionsToTransfer();
@@ -1202,7 +1171,7 @@ New version: {computedNewVersion}",
                         solution.Attributes.Remove("updateversion");
                         solution.Attributes.Remove("sortorder");
                         Service.Update(solution);
-                        mForm.UpdateSolutionVersion(solution);
+
                     }
 
                     solution.Attributes.Remove("newversion");
@@ -1245,10 +1214,10 @@ New version: {computedNewVersion}",
             }
 
             // Add items to progress form
-            pForm.Items = progressItems.Values.ToList();
-            pForm.Start();
+            // TODO: port progress to React
 
-            pForm.Show(dpMain, DockState.DockRight);
+
+
 
             StartExport(toProcessList.OfType<ExportToProcess>().First());
 
@@ -1258,7 +1227,7 @@ New version: {computedNewVersion}",
             timer.Start();
         }
 
-        private void DownloadLogFile(Guid importJobId, IOrganizationService service)
+        private void DownloadLogFile(Guid importJobId, IOrganizationService service, string asyncErrorMessage = null)
         {
             using (var dialog = new FolderBrowserDialog())
             {
@@ -1277,16 +1246,61 @@ New version: {computedNewVersion}",
                     Message = "Downloading log file",
                     Work = (sender, e) =>
                     {
+                        var timestamp = DateTime.Now.ToString("yyyy_MM_dd__HH_mm");
+                        var files = new List<string>();
+
+                        // Save the SDK formatted import log
                         var importLogRequest = new RetrieveFormattedImportJobResultsRequest
                         {
                             ImportJobId = importJobId
                         };
                         var importLogResponse = (RetrieveFormattedImportJobResultsResponse)service.Execute(importLogRequest);
 
-                        var filePath = $@"{dialog.SelectedPath}\{DateTime.Now:yyyy_MM_dd__HH_mm}.xml";
+                        var filePath = $@"{dialog.SelectedPath}\{timestamp}.xml";
                         File.WriteAllText(filePath, importLogResponse.FormattedResults);
+                        files.Add(filePath);
 
-                        e.Result = filePath;
+                        // If there's an async error message, save it split into message + XML
+                        if (!string.IsNullOrEmpty(asyncErrorMessage))
+                        {
+                            string textPart = asyncErrorMessage;
+                            string xmlPart = null;
+
+                            var xmlMatch = System.Text.RegularExpressions.Regex.Match(asyncErrorMessage, @"<(\w+)[\s>]");
+                            if (xmlMatch.Success)
+                            {
+                                textPart = asyncErrorMessage.Substring(0, xmlMatch.Index).Trim();
+                                xmlPart = asyncErrorMessage.Substring(xmlMatch.Index).Trim();
+                            }
+
+                            var msgPath = $@"{dialog.SelectedPath}\{timestamp}_message.txt";
+                            File.WriteAllText(msgPath, textPart);
+                            files.Add(msgPath);
+
+                            if (!string.IsNullOrEmpty(xmlPart))
+                            {
+                                // Try to pretty-print the XML
+                                try
+                                {
+                                    var doc = new System.Xml.XmlDocument();
+                                    doc.LoadXml(xmlPart);
+                                    using (var sw = new System.IO.StringWriter())
+                                    using (var xw = new System.Xml.XmlTextWriter(sw) { Formatting = System.Xml.Formatting.Indented, Indentation = 2 })
+                                    {
+                                        doc.WriteTo(xw);
+                                        xw.Flush();
+                                        xmlPart = sw.ToString();
+                                    }
+                                }
+                                catch { /* leave as-is if not valid XML */ }
+
+                                var xmlPath = $@"{dialog.SelectedPath}\{timestamp}_message.xml";
+                                File.WriteAllText(xmlPath, xmlPart);
+                                files.Add(xmlPath);
+                            }
+                        }
+
+                        e.Result = files;
                     },
                     PostWorkCallBack = e =>
                     {
@@ -1298,17 +1312,22 @@ New version: {computedNewVersion}",
                         }
                         else
                         {
+                            var files = (List<string>)e.Result;
+                            var fileList = string.Join("\n", files);
+
                             if (
                                 MessageBox.Show(
-                                    $@"Download completed!
+                                    $@"Download completed! ({files.Count} file(s))
 
-Would you like to open the file now ({e.Result})?
+{fileList}
+
+Would you like to open the log file now?
 
 (Microsoft Excel is required)",
                                     @"File Download", MessageBoxButtons.YesNo, MessageBoxIcon.Information) ==
                                 DialogResult.Yes)
                             {
-                                Process.Start("Excel.exe", $"\"{e.Result}\"");
+                                Process.Start("Excel.exe", $"\"{files[0]}\"");
                             }
                         }
 
@@ -1317,6 +1336,38 @@ Would you like to open the file now ({e.Result})?
                 });
                 }
             }
+        }
+
+        private void ViewImportMessage(Guid importJobId, IOrganizationService service, string solutionName)
+        {
+            WorkAsync(new WorkAsyncInfo
+            {
+                Message = "Retrieving import log...",
+                Work = (sender, e) =>
+                {
+                    var importLogRequest = new RetrieveFormattedImportJobResultsRequest
+                    {
+                        ImportJobId = importJobId
+                    };
+                    var importLogResponse = (RetrieveFormattedImportJobResultsResponse)service.Execute(importLogRequest);
+                    e.Result = importLogResponse.FormattedResults;
+                },
+                PostWorkCallBack = e =>
+                {
+                    if (e.Error != null)
+                    {
+                        MessageBox.Show(this,
+                            $"An error occurred while retrieving the import log.\n\n{e.Error.Message}",
+                            @"Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    using (var form = new Forms.ImportLogViewerForm((string)e.Result, solutionName))
+                    {
+                        form.ShowDialog(this);
+                    }
+                }
+            });
         }
 
         private string GetUpdatedSolutionVersion(Entity etpSolution)
@@ -1365,10 +1416,10 @@ Would you like to open the file now ({e.Result})?
         private List<Entity> PreparareSolutionsToTransfer()
         {
             var solutionsToTransfer = new List<Entity>();
-            if (mForm.SelectedSolutions.Count > 1)
+            if (currentSolutions.Count > 1)
             {
                 // Open dialog to order solutions import
-                foreach (var solution in mForm.SelectedSolutions)
+                foreach (var solution in currentSolutions)
                 {
                     solutionsToTransfer.Add(solution);
                 }
@@ -1385,7 +1436,7 @@ Would you like to open the file now ({e.Result})?
             }
             else
             {
-                solutionsToTransfer.Add(mForm.SelectedSolutions.First());
+                solutionsToTransfer.Add(currentSolutions.First());
             }
 
             return solutionsToTransfer;
@@ -1486,6 +1537,7 @@ Would you like to open the file now ({e.Result})?
                     Request = request
                 };
                 pi.LogFileRequested += Pi_LogFileRequested;
+                pi.ViewMessageRequested += Pi_ViewMessageRequested;
                 progressItems.Add(request, pi);
             }
 
@@ -1634,13 +1686,79 @@ Would you like to open the file now ({e.Result})?
                     }
 
                     var uniqueSolutions = (List<Entity>)e.Result;
+                    currentSolutions = uniqueSolutions;
 
-                    mForm.DisplaySolutions(uniqueSolutions);
-                    mForm.DisplayTargetOrganizationsSolutions(AdditionalConnectionDetails.ToList(), this);
+
+                    DisplaySolutionsInReact(uniqueSolutions);
+                    DisplayTargetSolutionsInReact(AdditionalConnectionDetails.ToList());
 
                     envVarsLoaded = false;
+                    orgSettingsLoaded = false;
                 }
             });
+        }
+
+        private void DisplaySolutionsInReact(List<Entity> solutions)
+        {
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(solutions.Select(s => new
+            {
+                solutionId = s.Id.ToString(),
+                uniqueName = s.GetAttributeValue<string>("uniquename") ?? "",
+                friendlyName = s.GetAttributeValue<string>("friendlyname") ?? "",
+                version = s.GetAttributeValue<string>("version") ?? "",
+                installedOn = s.GetAttributeValue<DateTime>("installedon").ToString("yy-MM-dd HH:mm"),
+                publisher = s.GetAttributeValue<EntityReference>("publisherid")?.Name ?? "",
+                description = s.GetAttributeValue<string>("description") ?? "",
+                isManaged = s.GetAttributeValue<bool>("ismanaged")
+            }));
+            cfForm.DisplaySolutions(json);
+        }
+
+        private void DisplayTargetSolutionsInReact(List<ConnectionDetail> connectionDetails)
+        {
+            var solutionUniqueNames = currentSolutions.Select(s => s.GetAttributeValue<string>("uniquename")).ToList();
+
+            foreach (var cd in connectionDetails)
+            {
+                WorkAsync(new WorkAsyncInfo
+                {
+                    Message = null,
+                    Work = (w, e) =>
+                    {
+                        var svc = cd.GetCrmServiceClient();
+                        var query = new QueryExpression("solution")
+                        {
+                            ColumnSet = new ColumnSet("uniquename", "version", "ismanaged"),
+                            Criteria = new FilterExpression
+                            {
+                                Conditions =
+                                {
+                                    new ConditionExpression("uniquename", ConditionOperator.In, solutionUniqueNames.ToArray())
+                                }
+                            }
+                        };
+                        var solutions = svc.RetrieveMultiple(query).Entities;
+                        e.Result = new Tuple<ConnectionDetail, List<Entity>>(cd, solutions.ToList());
+                    },
+                    PostWorkCallBack = (e) =>
+                    {
+                        if (e.Error != null) return;
+                        var result = (Tuple<ConnectionDetail, List<Entity>>)e.Result;
+                        var tcd = result.Item1;
+                        var solutions = result.Item2;
+
+                        cfForm.AddTargetSolutionColumn(tcd.ConnectionName);
+
+                        var json = Newtonsoft.Json.JsonConvert.SerializeObject(solutions.Select(s => new
+                        {
+                            uniqueName = s.GetAttributeValue<string>("uniquename"),
+                            version = s.GetAttributeValue<string>("version"),
+                            isManaged = s.GetAttributeValue<bool>("ismanaged")
+                        }));
+                        cfForm.SetTargetSolutions(tcd.ConnectionName, json);
+                    }
+                });
+            }
         }
 
         private void RetrieveEnvironmentVariables()
@@ -1690,11 +1808,13 @@ Would you like to open the file now ({e.Result})?
                     }
 
                     var result = (Tuple<List<Entity>, List<Entity>>)e.Result;
-                    evForm.DisplayEnvironmentVariables(result.Item1, result.Item2);
+
+                    DisplayEnvVarsInReact(result.Item1, result.Item2);
 
                     if (AdditionalConnectionDetails.Any())
                     {
-                        evForm.DisplayTargetEnvironmentValues(AdditionalConnectionDetails.ToList(), this);
+
+                        DisplayTargetEnvVarsInReact(AdditionalConnectionDetails.ToList());
                     }
                 }
             });
@@ -1718,6 +1838,192 @@ Would you like to open the file now ({e.Result})?
             cfForm.InvokeDeactivateSelected();
         }
 
+        #endregion Cloud Flows
+
+        #region Org Settings
+
+        private void tsbRefreshSettings_Click(object sender, EventArgs e)
+        {
+            orgSettingsLoaded = false;
+            RetrieveOrgSettings();
+            orgSettingsLoaded = true;
+        }
+
+        private void tsbSyncSelectedSettings_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void tsbSyncAllSettings_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OsForm_SyncRequested(object sender, Forms.SettingSyncRequestedEventArgs e)
+        {
+            if (!AdditionalConnectionDetails.Any())
+            {
+                MessageBox.Show(this, "No target environments connected.",
+                    "No Targets", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var settingNames = string.Join("\n", e.Settings.Select(s => $"  • {s.DisplayName} = {s.SourceValue}"));
+            var targetNames = string.Join(", ", AdditionalConnectionDetails.Select(c => c.ConnectionName));
+
+            var confirm = MessageBox.Show(this,
+                $"Sync {e.Settings.Count} setting(s) from source to {targetNames}?\n\n{settingNames}",
+                "Confirm Sync Settings",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes) return;
+
+            foreach (var cd in AdditionalConnectionDetails)
+            {
+                var localCd = cd;
+                WorkAsync(new WorkAsyncInfo
+                {
+                    Message = $"Syncing settings to {localCd.ConnectionName}...",
+                    Work = (bw, we) =>
+                    {
+                        var svc = localCd.GetCrmServiceClient();
+                        var errors = new List<string>();
+
+                        // Get existing organizationsetting records on target
+                        var existingQuery = new QueryExpression("organizationsetting")
+                        {
+                            ColumnSet = new ColumnSet("settingdefinitionid", "value")
+                        };
+                        var existingValues = svc.RetrieveMultiple(existingQuery).Entities;
+
+                        // Get setting definitions on target to resolve IDs
+                        var defQuery = new QueryExpression("settingdefinition")
+                        {
+                            ColumnSet = new ColumnSet("uniquename")
+                        };
+                        var targetDefs = svc.RetrieveMultiple(defQuery).Entities;
+                        var targetDefLookup = targetDefs.ToDictionary(
+                            d => d.GetAttributeValue<string>("uniquename") ?? "",
+                            d => d.Id);
+
+                        foreach (var setting in e.Settings)
+                        {
+                            try
+                            {
+                                if (!targetDefLookup.ContainsKey(setting.UniqueName))
+                                {
+                                    errors.Add($"{setting.DisplayName}: not found on target");
+                                    continue;
+                                }
+
+                                var targetDefId = targetDefLookup[setting.UniqueName];
+
+                                // Check if there's an existing override
+                                var existing = existingValues.FirstOrDefault(v =>
+                                    v.GetAttributeValue<EntityReference>("settingdefinitionid")?.Id == targetDefId);
+
+                                if (existing != null)
+                                {
+                                    // Update existing
+                                    existing["value"] = setting.SourceValue;
+                                    svc.Update(existing);
+                                }
+                                else
+                                {
+                                    // Create new override
+                                    var newSetting = new Entity("organizationsetting");
+                                    newSetting["settingdefinitionid"] = new EntityReference("settingdefinition", targetDefId);
+                                    newSetting["value"] = setting.SourceValue;
+                                    svc.Create(newSetting);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                errors.Add($"{setting.DisplayName}: {ex.Message}");
+                            }
+                        }
+
+                        we.Result = errors;
+                    },
+                    PostWorkCallBack = we =>
+                    {
+                        if (we.Error != null)
+                        {
+                            MessageBox.Show(this, $"Error syncing to {localCd.ConnectionName}:\n{we.Error.Message}",
+                                "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+
+                        var errors = (List<string>)we.Result;
+                        if (errors.Any())
+                        {
+                            MessageBox.Show(this,
+                                $"Sync to {localCd.ConnectionName} completed with errors:\n" +
+                                string.Join("\n", errors),
+                                "Sync Partial", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                        else
+                        {
+                            MessageBox.Show(this,
+                                $"Settings synced to {localCd.ConnectionName} successfully.",
+                                "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+
+                        // Refresh to show updated values
+                        orgSettingsLoaded = false;
+                        RetrieveOrgSettings();
+                        orgSettingsLoaded = true;
+                    }
+                });
+            }
+        }
+
+        #endregion Org Settings
+
+        private void tsbGdsAuth_Click(object sender, EventArgs e)
+        {
+            // Try silent first (ADAL cache may have a multi-resource refresh token)
+            if (!EnvironmentIdResolver.TrySilentAuth(ConnectionDetail))
+            {
+                // Open interactive browser auth
+                EnvironmentIdResolver.AuthenticateInteractively(ConnectionDetail, this);
+            }
+            UpdateGdsAuthButton();
+
+            // Re-resolve environment IDs now that we have a token
+            if (EnvironmentIdResolver.HasGdsToken)
+            {
+                // Re-resolve source environment ID
+                if (ConnectionDetail != null)
+                {
+                    var srcEnvId = EnvironmentIdResolver.Resolve(ConnectionDetail);
+                    cfForm?.SetSourceEnvironment(srcEnvId);
+
+                }
+
+                // Re-resolve target environment IDs
+                if (cfForm != null && AdditionalConnectionDetails.Any())
+                {
+                    cfForm.DisplayTargetFlowStatus(AdditionalConnectionDetails.ToList(), this);
+                }
+            }
+        }
+
+        private void UpdateGdsAuthButton()
+        {
+            if (EnvironmentIdResolver.HasGdsToken)
+            {
+                tsbGdsAuth.Text = "Authenticated ✓";
+                tsbGdsAuth.ToolTipText = "Signed in to Power Platform — maker portal links available";
+            }
+            else
+            {
+                tsbGdsAuth.Text = "Power Platform Auth";
+                tsbGdsAuth.ToolTipText = "Sign in to Power Platform for maker portal links";
+            }
+        }
+
         private void CfForm_RefreshRequested(object sender, EventArgs e)
         {
             flowsLoaded = false;
@@ -1726,12 +2032,19 @@ Would you like to open the file now ({e.Result})?
 
         private void CfForm_ActivateRequested(object sender, FlowActivateRequestedEventArgs e)
         {
-            ToggleFlowsOnTargets(e, true);
+
+
         }
 
         private void CfForm_DeactivateRequested(object sender, FlowActivateRequestedEventArgs e)
         {
-            ToggleFlowsOnTargets(e, false);
+
+
+        }
+
+        private void FlowActionPanel_ActionRequested(object sender, FlowActionRequestedEventArgs e)
+        {
+            ToggleFlowsOnSingleTarget(e.Flows, e.TargetDetail, e.Activate);
         }
 
         private void RetrieveCloudFlows()
@@ -1805,6 +2118,190 @@ Would you like to open the file now ({e.Result})?
             });
         }
 
+        private static string GetEnvVarTypeName(int typeValue)
+        {
+            switch (typeValue) {
+                case 100000000: return "String";
+                case 100000001: return "Number";
+                case 100000002: return "Boolean";
+                case 100000003: return "JSON";
+                case 100000004: return "Data Source";
+                case 100000005: return "Secret";
+                default: return "String";
+            }
+        }
+
+        private void DisplayEnvVarsInReact(List<Entity> definitions, List<Entity> values)
+        {
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(definitions.Select(def =>
+            {
+                var typeVal = def.GetAttributeValue<OptionSetValue>("type")?.Value ?? 100000000;
+                var defId = def.Id.ToString();
+                var val = values.FirstOrDefault(v =>
+                    v.GetAttributeValue<EntityReference>("environmentvariabledefinitionid")?.Id == def.Id);
+                return new
+                {
+                    definitionId = defId,
+                    displayName = def.GetAttributeValue<string>("displayname") ?? "",
+                    schemaName = def.GetAttributeValue<string>("schemaname") ?? "",
+                    type = GetEnvVarTypeName(typeVal),
+                    typeValue = typeVal,
+                    defaultValue = def.GetAttributeValue<string>("defaultvalue") ?? "",
+                    currentValue = val?.GetAttributeValue<string>("value") ?? ""
+                };
+            }));
+            cfForm.DisplayEnvVars(json);
+        }
+
+        private void DisplayTargetEnvVarsInReact(List<ConnectionDetail> connectionDetails)
+        {
+            foreach (var cd in connectionDetails)
+            {
+                WorkAsync(new WorkAsyncInfo
+                {
+                    Message = null,
+                    Work = (w, e) =>
+                    {
+                        var svc = cd.GetCrmServiceClient();
+                        var defQuery = new QueryExpression("environmentvariabledefinition")
+                        {
+                            ColumnSet = new ColumnSet("schemaname"),
+                            Criteria = new FilterExpression { Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) } }
+                        };
+                        var defs = svc.RetrieveMultiple(defQuery).Entities.ToList();
+
+                        var valQuery = new QueryExpression("environmentvariablevalue")
+                        {
+                            ColumnSet = new ColumnSet("value", "environmentvariabledefinitionid"),
+                            Criteria = new FilterExpression { Conditions = { new ConditionExpression("statecode", ConditionOperator.Equal, 0) } }
+                        };
+                        var vals = svc.RetrieveMultiple(valQuery).Entities.ToList();
+
+                        e.Result = new Tuple<ConnectionDetail, List<Entity>, List<Entity>>(cd, defs, vals);
+                    },
+                    PostWorkCallBack = (e) =>
+                    {
+                        if (e.Error != null) return;
+                        var result = (Tuple<ConnectionDetail, List<Entity>, List<Entity>>)e.Result;
+                        var tcd = result.Item1;
+                        var defs = result.Item2;
+                        var vals = result.Item3;
+
+                        cfForm.AddTargetEnvVarColumn(tcd.ConnectionName);
+
+                        var json = Newtonsoft.Json.JsonConvert.SerializeObject(defs.Select(d =>
+                        {
+                            var val = vals.FirstOrDefault(v =>
+                                v.GetAttributeValue<EntityReference>("environmentvariabledefinitionid")?.Id == d.Id);
+                            return new
+                            {
+                                schemaName = d.GetAttributeValue<string>("schemaname"),
+                                value = val?.GetAttributeValue<string>("value") ?? "",
+                                exists = true
+                            };
+                        }));
+                        cfForm.SetTargetEnvVarValues(tcd.ConnectionName, json);
+                    }
+                });
+            }
+        }
+
+        private void RetrieveOrgSettings()
+        {
+
+            DisplayOrgSettingsInReact();
+
+            if (AdditionalConnectionDetails.Any())
+            {
+
+                DisplayTargetOrgSettingsInReact(AdditionalConnectionDetails.ToList());
+            }
+        }
+
+        private void DisplayOrgSettingsInReact()
+        {
+            WorkAsync(new WorkAsyncInfo
+            {
+                Message = null,
+                Work = (bw, e) =>
+                {
+                    var query = new QueryExpression("organization")
+                    {
+                        ColumnSet = new ColumnSet(true)
+                    };
+                    var org = sourceService.RetrieveMultiple(query).Entities.FirstOrDefault();
+                    e.Result = org;
+                },
+                PostWorkCallBack = e =>
+                {
+                    if (e.Error != null || e.Result == null) return;
+                    var org = (Entity)e.Result;
+                    var settings = org.Attributes
+                        .Where(a => a.Value != null && !(a.Value is EntityReference) && !(a.Value is OptionSetValue) && a.Key != "organizationid")
+                        .Select(a => new
+                        {
+                            uniqueName = a.Key,
+                            displayName = a.Key,
+                            category = "General",
+                            value = a.Value?.ToString() ?? ""
+                        })
+                        .OrderBy(s => s.displayName);
+
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(settings);
+                    cfForm.DisplaySettings(json);
+                }
+            });
+        }
+
+        private void DisplayTargetOrgSettingsInReact(List<ConnectionDetail> connectionDetails)
+        {
+            foreach (var cd in connectionDetails)
+            {
+                WorkAsync(new WorkAsyncInfo
+                {
+                    Message = null,
+                    Work = (w, e) =>
+                    {
+                        var svc = cd.GetCrmServiceClient();
+                        var query = new QueryExpression("organization")
+                        {
+                            ColumnSet = new ColumnSet(true)
+                        };
+                        var org = svc.RetrieveMultiple(query).Entities.FirstOrDefault();
+                        e.Result = new Tuple<ConnectionDetail, Entity>(cd, org);
+                    },
+                    PostWorkCallBack = (e) =>
+                    {
+                        if (e.Error != null) return;
+                        var result = (Tuple<ConnectionDetail, Entity>)e.Result;
+                        var tcd = result.Item1;
+                        var org = result.Item2;
+                        if (org == null) return;
+
+                        cfForm.AddTargetSettingColumn(tcd.ConnectionName);
+
+                        var settings = org.Attributes
+                            .Where(a => a.Value != null && !(a.Value is EntityReference) && !(a.Value is OptionSetValue) && a.Key != "organizationid")
+                            .Select(a => new
+                            {
+                                uniqueName = a.Key,
+                                value = a.Value?.ToString() ?? ""
+                            });
+
+                        var json = Newtonsoft.Json.JsonConvert.SerializeObject(settings);
+                        cfForm.SetTargetSettingValues(tcd.ConnectionName, json);
+                    }
+                });
+            }
+        }
+
+        private void OsForm_RefreshRequested(object sender, EventArgs e)
+        {
+            orgSettingsLoaded = false;
+            RetrieveOrgSettings();
+            orgSettingsLoaded = true;
+        }
+
         private void ToggleFlowsOnTargets(FlowActivateRequestedEventArgs e, bool activate)
         {
             if (!AdditionalConnectionDetails.Any())
@@ -1869,17 +2366,26 @@ Would you like to open the file now ({e.Result})?
                             };
 
                             svc.Execute(setState);
-                            we.Result = new Tuple<ConnectionDetail, FlowActionItem, Guid>(cd, flow, targetFlowId);
+                            var resolvedEnvId = ResolveEnvironmentId(cd, svc);
+                            we.Result = new Tuple<ConnectionDetail, FlowActionItem, Guid, string>(cd, flow, targetFlowId, resolvedEnvId);
                         },
                         PostWorkCallBack = we =>
                         {
                             completedOps++;
 
+                            string envId = cd.EnvironmentId;
+                            if (we.Error == null)
+                            {
+                                var tuple = (Tuple<ConnectionDetail, FlowActionItem, Guid, string>)we.Result;
+                                envId = tuple.Item4;
+                            }
+
                             var result = new FlowToggleResult
                             {
                                 FlowName = flow.FlowName,
                                 TargetName = cd.ConnectionName,
-                                TargetOrgUrl = cd.WebApplicationUrl
+                                TargetOrgUrl = cd.WebApplicationUrl,
+                                TargetEnvironmentId = envId
                             };
 
                             if (we.Error != null)
@@ -1914,44 +2420,20 @@ Would you like to open the file now ({e.Result})?
                                 catch { /* best effort */ }
 
                                 // Mark the target cell as failed
-                                var col = cfForm.LvFlows.Columns.Cast<ColumnHeader>()
-                                    .FirstOrDefault(c => c.Text == cd.ConnectionName);
-                                if (col != null && flow.Item.SubItems.Count > col.Index)
-                                {
-                                    var subItem = flow.Item.SubItems[col.Index];
-                                    subItem.BackColor = Color.MistyRose;
-                                    subItem.ForeColor = Color.DarkRed;
-                                    if (result.IsConnectionRefError)
-                                        subItem.Text += " ⚠";
-                                }
+                                cfForm.UpdateFlowCellStatus(cd.ConnectionName, flow.FlowName,
+                                    activate, isMatch: false, isError: true,
+                                    errorWarning: result.IsConnectionRefError ? "⚠" : null);
                             }
                             else
                             {
-                                var tuple = (Tuple<ConnectionDetail, FlowActionItem, Guid>)we.Result;
+                                var tuple = (Tuple<ConnectionDetail, FlowActionItem, Guid, string>)we.Result;
                                 result.Success = true;
                                 result.TargetFlowId = tuple.Item3;
 
-                                var col = cfForm.LvFlows.Columns.Cast<ColumnHeader>()
-                                    .FirstOrDefault(c => c.Text == cd.ConnectionName);
-                                if (col != null && flow.Item.SubItems.Count > col.Index)
-                                {
-                                    var subItem = flow.Item.SubItems[col.Index];
-                                    subItem.Text = activate ? "On" : "Off";
-
-                                    var sourceState = ((Entity)flow.Item.Tag).GetAttributeValue<OptionSetValue>("statecode")?.Value ?? 0;
-                                    var targetState = activate ? 1 : 0;
-
-                                    if (targetState == sourceState)
-                                    {
-                                        subItem.BackColor = Color.LightGreen;
-                                        subItem.ForeColor = Color.DarkGreen;
-                                    }
-                                    else
-                                    {
-                                        subItem.BackColor = SystemColors.Info;
-                                        subItem.ForeColor = Color.DarkRed;
-                                    }
-                                }
+                                var sourceState = flow.Workflow?.GetAttributeValue<OptionSetValue>("statecode")?.Value ?? 0;
+                                var targetState = activate ? 1 : 0;
+                                cfForm.UpdateFlowCellStatus(cd.ConnectionName, flow.FlowName,
+                                    activate, isMatch: targetState == sourceState);
                             }
 
                             results.Add(result);
@@ -1970,7 +2452,141 @@ Would you like to open the file now ({e.Result})?
             }
         }
 
-        #endregion Cloud Flows
+        private void ToggleFlowsOnSingleTarget(List<FlowActionItem> flows, ConnectionDetail cd, bool activate)
+        {
+            var action = activate ? "Activate" : "Deactivate";
+            var flowNames = string.Join("\n", flows.Select(f => $"  • {f.FlowName}"));
+
+            var confirm = MessageBox.Show(this,
+                $"Are you sure you want to {action.ToLower()} these {flows.Count} flow(s) on {cd.ConnectionName}?\n\n{flowNames}",
+                $"Confirm {action}",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes) return;
+
+            var results = new List<FlowToggleResult>();
+            int totalOps = flows.Count;
+            int completedOps = 0;
+
+            foreach (var flow in flows)
+            {
+                WorkAsync(new WorkAsyncInfo
+                {
+                    Message = $"{(activate ? "Activating" : "Deactivating")} \"{flow.FlowName}\" on {cd.ConnectionName}...",
+                    Work = (bw, we) =>
+                    {
+                        var svc = cd.GetCrmServiceClient();
+
+                        var query = new QueryExpression("workflow")
+                        {
+                            ColumnSet = new ColumnSet("workflowid", "statecode"),
+                            Criteria = new FilterExpression
+                            {
+                                Conditions =
+                                {
+                                    new ConditionExpression("name", ConditionOperator.Equal, flow.FlowName),
+                                    new ConditionExpression("category", ConditionOperator.Equal, 5),
+                                    new ConditionExpression("type", ConditionOperator.Equal, 1)
+                                }
+                            }
+                        };
+
+                        var targetFlow = svc.RetrieveMultiple(query).Entities.FirstOrDefault();
+                        if (targetFlow == null)
+                            throw new Exception($"Flow not found on {cd.ConnectionName}");
+
+                        var setState = new Microsoft.Crm.Sdk.Messages.SetStateRequest
+                        {
+                            EntityMoniker = targetFlow.ToEntityReference(),
+                            State = new OptionSetValue(activate ? 1 : 0),
+                            Status = new OptionSetValue(activate ? 2 : 1)
+                        };
+
+                        svc.Execute(setState);
+                        var resolvedEnvId = ResolveEnvironmentId(cd, svc);
+                        we.Result = new Tuple<Guid, string>(targetFlow.Id, resolvedEnvId);
+                    },
+                    PostWorkCallBack = we =>
+                    {
+                        completedOps++;
+
+                        string envId = cd.EnvironmentId;
+
+                        var result = new FlowToggleResult
+                        {
+                            FlowName = flow.FlowName,
+                            TargetName = cd.ConnectionName,
+                            TargetOrgUrl = cd.WebApplicationUrl,
+                            TargetEnvironmentId = envId
+                        };
+
+                        if (we.Error != null)
+                        {
+                            var errorMsg = we.Error.Message;
+                            result.Success = false;
+                            result.ErrorMessage = errorMsg;
+                            result.IsConnectionRefError = errorMsg.Contains("ConnectionAuthorizationFailed")
+                                || errorMsg.Contains("cannot be used to activate");
+
+                            try
+                            {
+                                var svc = cd.GetCrmServiceClient();
+                                var q = new QueryExpression("workflow")
+                                {
+                                    ColumnSet = new ColumnSet("workflowid"),
+                                    Criteria = new FilterExpression
+                                    {
+                                        Conditions =
+                                        {
+                                            new ConditionExpression("name", ConditionOperator.Equal, flow.FlowName),
+                                            new ConditionExpression("category", ConditionOperator.Equal, 5),
+                                            new ConditionExpression("type", ConditionOperator.Equal, 1)
+                                        }
+                                    }
+                                };
+                                var tf = svc.RetrieveMultiple(q).Entities.FirstOrDefault();
+                                if (tf != null) result.TargetFlowId = tf.Id;
+                            }
+                            catch { }
+
+
+                        }
+                        else
+                        {
+                            var tuple = (Tuple<Guid, string>)we.Result;
+                            result.Success = true;
+                            result.TargetFlowId = tuple.Item1;
+                            result.TargetEnvironmentId = tuple.Item2;
+
+                            // Update the cell in the flows list
+                            var sourceState = flow.Workflow?.GetAttributeValue<OptionSetValue>("statecode")?.Value ?? 0;
+                            var targetState = activate ? 1 : 0;
+                            cfForm.UpdateFlowCellStatus(cd.ConnectionName, flow.FlowName,
+                                activate, isMatch: targetState == sourceState);
+                        }
+
+                        results.Add(result);
+
+                        if (completedOps >= totalOps)
+                        {
+                            if (results.All(r => r.Success))
+                            {
+
+                            }
+                            else if (results.Any(r => !r.Success))
+                            {
+                                // Already set per-error above; show results dialog for details
+                                using (var resultsForm = new FlowResultsForm(action, results))
+                                {
+                                    resultsForm.ShowDialog(this);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
 
         private void RunImport(ImportToProcess itp)
         {
@@ -2020,7 +2636,6 @@ Would you like to open the file now ({e.Result})?
                         @"Warning",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
-                    sForm.Show(dpMain, sForm.DockState);
                     return;
                 }
             }
@@ -2068,7 +2683,7 @@ Would you like to open the file now ({e.Result})?
                         etp.Succeeded = false;
 
                         progressItems[etp.Request].Error(DateTime.Now, evt.Error.Message);
-                        pForm.ShowRetryButton(progressItems[etp.Request]);
+
 
                         ToggleWaitMode(false);
                     }
@@ -2104,6 +2719,11 @@ Would you like to open the file now ({e.Result})?
 
         private void Timer_Elapsed(object sender, EventArgs e)
         {
+            if (isPolling) return;
+            isPolling = true;
+
+            try
+            {
             if (cancelPending)
             {
                 timer.Stop();
@@ -2143,6 +2763,8 @@ Would you like to open the file now ({e.Result})?
                 }
                 else if (etp.IsProcessing && (oneTimeSettings ?? settings).ExportAsynchronously)
                 {
+                    if (etp.AsyncOperationId == Guid.Empty) continue;
+
                     WorkAsync(new WorkAsyncInfo
                     {
                         Message = null,
@@ -2163,6 +2785,8 @@ Would you like to open the file now ({e.Result})?
                         },
                         PostWorkCallBack = evt =>
                         {
+                            if (evt.Error != null) return;
+
                             var task = (Entity)evt.Result;
                             if (task != null)
                             {
@@ -2221,9 +2845,7 @@ Would you like to open the file now ({e.Result})?
                                     else
                                     {
                                         progressItems[etp.Request].Error(task.GetAttributeValue<DateTime>("completedon").ToLocalTime());
-                                        ToggleWaitMode(false);
-                                        timer.Stop();
-                                        pForm.ShowRetryButton(progressItems[etp.Request]);
+
                                     }
 
                                     if (toProcessList.All(tp => tp.IsProcessed))
@@ -2279,10 +2901,9 @@ Would you like to open the file now ({e.Result})?
                                         if (MessageBox.Show(this, $"An error when checking for missing components:\n\n{evt.Error.Message}\n\nDo you want to continue to import?", "Error", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.No)
                                         {
                                             progressItems[itp.Request].Error(DateTime.Now, "An error when checking for missing components");
+                                            itp.IsProcessed = true;
                                             itp.IsProcessing = false;
-                                            ToggleWaitMode(false);
-                                            timer.Stop();
-                                            pForm.ShowRetryButton(progressItems[itp.Request]);
+
 
                                             return;
                                         }
@@ -2310,10 +2931,9 @@ Would you like to open the file now ({e.Result})?
                                     }));
 
                                     progressItems[itp.Request].Error(DateTime.Now, "Your solution has missing components in the target environment");
+                                    itp.IsProcessed = true;
                                     itp.IsProcessing = false;
-                                    ToggleWaitMode(false);
-                                    timer.Stop();
-                                    pForm.ShowRetryButton(progressItems[itp.Request]);
+
 
                                     if ((oneTimeSettings ?? settings).UseWindowsToastNotification)
                                     {
@@ -2347,6 +2967,8 @@ Would you like to open the file now ({e.Result})?
                 }
                 else if (itp.IsProcessing)
                 {
+                    if (itp.AsyncOperationId == Guid.Empty) continue;
+
                     WorkAsync(new WorkAsyncInfo
                     {
                         Message = null,
@@ -2367,6 +2989,8 @@ Would you like to open the file now ({e.Result})?
                         },
                         PostWorkCallBack = evt =>
                         {
+                            if (evt.Error != null) return;
+
                             var task = (Entity)evt.Result;
                             if (task != null)
                             {
@@ -2379,10 +3003,12 @@ Would you like to open the file now ({e.Result})?
                                     {
                                         progressItems[itp.Request].Success(itp);
                                         itp.Succeeded = true;
+                                        lastTargetService = itp.Detail.GetCrmServiceClient();
+                                        lastConnectionName = itp.Detail.ConnectionName;
 
                                         Invoke(new Action(() =>
                                         {
-                                            mForm.SetTargetSolutionVersion(itp.Solution, itp.Detail);
+
                                         }));
 
                                         if ((oneTimeSettings ?? settings).UseWindowsToastNotification)
@@ -2410,10 +3036,10 @@ Would you like to open the file now ({e.Result})?
                                     }
                                     else
                                     {
-                                        progressItems[itp.Request].Error(task.GetAttributeValue<DateTime>("completedon").ToLocalTime());
-                                        ToggleWaitMode(false);
-                                        timer.Stop();
-                                        pForm.ShowRetryButton(progressItems[itp.Request]);
+                                        var asyncMessage = task.GetAttributeValue<string>("message");
+                                        progressItems[itp.Request].Error(task.GetAttributeValue<DateTime>("completedon").ToLocalTime(), asyncMessage);
+                                        progressItems[itp.Request].AsyncErrorMessage = asyncMessage;
+
 
                                         if ((oneTimeSettings ?? settings).UseWindowsToastNotification)
                                         {
@@ -2477,6 +3103,8 @@ Would you like to open the file now ({e.Result})?
                                         },
                                         PostWorkCallBack = evt2 =>
                                         {
+                                            if (evt2.Error != null) return;
+
                                             var job = (Entity)evt2.Result;
                                             if (job != null)
                                             {
@@ -2532,8 +3160,11 @@ Would you like to open the file now ({e.Result})?
                                 progressItems[ptp.Request].Success(ptp);
                             }
 
-                            timer.Stop();
-                            ToggleWaitMode(false);
+                            if (toProcessList.All(tp => tp.IsProcessed))
+                            {
+                                timer.Stop();
+                                ToggleWaitMode(false);
+                            }
                         }
                     });
                 }
@@ -2544,14 +3175,20 @@ Would you like to open the file now ({e.Result})?
                    && !ptp.IsProcessed)
                 {
                     progressItems[ptp.Request].Error(DateTime.Now);
-                    timer.Stop();
-                    ToggleWaitMode(false);
+                    ptp.IsProcessed = true;
+                    ptp.IsProcessing = false;
                 }
             }
 
             if (toProcessList.All(p => p.IsProcessed))
             {
                 timer.Stop();
+                ToggleWaitMode(false);
+            }
+            }
+            finally
+            {
+                isPolling = false;
             }
         }
 
@@ -2627,6 +3264,11 @@ Would you like to open the file now ({e.Result})?
             }
         }
 
+        private static string ResolveEnvironmentId(ConnectionDetail detail, IOrganizationService service)
+        {
+            return EnvironmentIdResolver.Resolve(detail);
+        }
+
         private void ToggleWaitMode(bool on)
         {
             Invoke(new Action(() =>
@@ -2642,6 +3284,7 @@ Would you like to open the file now ({e.Result})?
                     tsbImportFromFile.Enabled = false;
                     tsbRemoveFromTargets.Enabled = false;
                     tsbCancel.Visible = true;
+                    tsbRefreshStatus.Visible = true;
                 }
                 else
                 {
@@ -2655,6 +3298,7 @@ Would you like to open the file now ({e.Result})?
                     tsbImportFromFile.Enabled = true;
                     tsbRemoveFromTargets.Enabled = true;
                     tsbCancel.Visible = false;
+                    tsbRefreshStatus.Visible = false;
                 }
             }));
         }
@@ -2665,9 +3309,25 @@ Would you like to open the file now ({e.Result})?
             tsbCancel.Text = "Cancelling...";
         }
 
+        private void tsbRefreshStatus_Click(object sender, EventArgs e)
+        {
+            if (!timer.Enabled)
+            {
+                isPolling = false;
+                timer.Tick -= Timer_Elapsed;
+                timer.Tick += Timer_Elapsed;
+                timer.Interval = (int)(oneTimeSettings ?? settings).RefreshIntervalProp.TotalMilliseconds;
+                timer.Start();
+            }
+            else
+            {
+                isPolling = false;
+            }
+        }
+
         private void tsbDownload_Click(object sender, EventArgs e)
         {
-            if (mForm.SelectedSolutions.Count == 0)
+            if (currentSolutions.Count == 0)
             {
                 MessageBox.Show(this, @"No solution selected!", @"Warning", MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -2687,7 +3347,7 @@ Would you like to open the file now ({e.Result})?
                 path = dialog.FolderPath;
             }
 
-            var solutions = mForm.SelectedSolutions;
+            var solutions = currentSolutions;
 
             if ((oneTimeSettings ?? settings).ExportAsynchronously)
             {
@@ -2707,10 +3367,10 @@ Would you like to open the file now ({e.Result})?
                     toProcessList.Add(exportItem);
                 }
 
-                pForm.Items = progressItems.Values.ToList();
-                pForm.Start();
+            // TODO: port progress to React
 
-                pForm.Show(dpMain, DockState.DockRight);
+
+
 
                 StartExport(toProcessList.OfType<ExportToProcess>().First());
 

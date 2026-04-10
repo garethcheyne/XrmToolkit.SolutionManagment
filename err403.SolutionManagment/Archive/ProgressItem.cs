@@ -21,6 +21,7 @@ namespace err403.SolutionManagment
         }
 
         public event EventHandler<DownloadLogEventArgs> LogFileRequested;
+        public event EventHandler<DownloadLogEventArgs> ViewMessageRequested;
 
         public ConnectionDetail Detail { get; set; }
         public OrganizationRequest Request { get; set; }
@@ -28,6 +29,7 @@ namespace err403.SolutionManagment
         public byte[] SolutionFile { get; set; }
         public string SolutionFileName => Request is ExportSolutionRequest esr ? $"{esr.SolutionName}_{SolutionVersion.Replace(".", "_")}{(esr.Managed ? "_managed" : "")}.zip" : "";
         public string SolutionVersion { get; set; }
+        public string AsyncErrorMessage { get; set; }
         public Enumerations.RequestType Type { get; set; }
 
         public void CheckDependencies()
@@ -63,6 +65,7 @@ namespace err403.SolutionManagment
                 else
                 {
                     llDownloadLog.Visible = true;
+                    llViewMessage.Visible = Request is ImportSolutionRequest || Request is StageAndUpgradeRequest;
                 }
                 lblProgress.Text += $@" - {date:HH:mm:ss}";
             }));
@@ -115,6 +118,7 @@ namespace err403.SolutionManagment
                 pbProgress.Image = ilProgress.Images[3];
                 llDownloadLog.Visible = Request is ImportSolutionRequest || Request is ExportSolutionRequest || Request is StageAndUpgradeRequest;
                 llDownloadLog.Text = Request is ImportSolutionRequest || Request is StageAndUpgradeRequest ? "Download log file" : "Download solution";
+                llViewMessage.Visible = Request is ImportSolutionRequest || Request is StageAndUpgradeRequest;
                 lblProgress.Text = p.FinishedOn;
                 lblPercentage.Visible = false;
 
@@ -197,6 +201,26 @@ namespace err403.SolutionManagment
                         MessageBox.Show(Parent, $@"File saved to {sfd.FileName}", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
+            }
+        }
+
+        private void llViewMessage_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            if (Request is ImportSolutionRequest isr)
+            {
+                ViewMessageRequested?.Invoke(this, new DownloadLogEventArgs
+                {
+                    ImportJobId = isr.ImportJobId,
+                    Service = Detail.GetCrmServiceClient()
+                });
+            }
+            else if (Request is StageAndUpgradeRequest saur)
+            {
+                ViewMessageRequested?.Invoke(this, new DownloadLogEventArgs
+                {
+                    ImportJobId = saur.ImportJobId,
+                    Service = Detail.GetCrmServiceClient()
+                });
             }
         }
 

@@ -3,6 +3,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -31,6 +32,10 @@ namespace err403.SolutionManagment.Forms
         private List<ListViewItem> allFlowItems = new List<ListViewItem>();
         private List<ListViewItem> filteredByActiveItems = new List<ListViewItem>();
         private const int MaxColumnWidth = 350;
+        private const string DefaultSolutionId = "fd140aaf-4df4-11dd-bd17-0019b9312238";
+        private string sourceEnvironmentId;
+        private int lastRightClickColumnIndex = -1;
+        private readonly Dictionary<string, string> targetEnvironmentIds = new Dictionary<string, string>();
 
         public event EventHandler RefreshRequested;
         public event EventHandler<FlowActivateRequestedEventArgs> ActivateRequested;
@@ -42,6 +47,24 @@ namespace err403.SolutionManagment.Forms
         public CloudFlowsForm()
         {
             InitializeComponent();
+
+            var ctxMenu = new ContextMenuStrip();
+            var miOpen = new ToolStripMenuItem("Open in Maker Portal");
+            miOpen.Click += MiOpenInPowerAutomate_Click;
+            ctxMenu.Items.Add(miOpen);
+            ctxMenu.Opening += (s, ev) =>
+            {
+                miOpen.Enabled = lvFlows.SelectedItems.Count > 0
+                    && GetEnvironmentIdForColumn(lastRightClickColumnIndex) != null;
+            };
+            lvFlows.ContextMenuStrip = ctxMenu;
+            lvFlows.MouseUp += LvFlows_MouseUp;
+            lvFlows.DoubleClick += LvFlows_DoubleClick;
+        }
+
+        public void SetSourceEnvironment(string environmentId)
+        {
+            sourceEnvironmentId = environmentId;
         }
 
         public void DisplayCloudFlows(List<Entity> workflows)
@@ -126,6 +149,9 @@ namespace err403.SolutionManagment.Forms
                     {
                         var svc = cd.GetCrmServiceClient();
 
+                        // Resolve environment ID for this target using shared resolver
+                        string envId = AppCode.EnvironmentIdResolver.Resolve(cd);
+
                         var query = new QueryExpression("workflow")
                         {
                             ColumnSet = new ColumnSet("name", "statecode", "statuscode", "category"),
@@ -139,15 +165,19 @@ namespace err403.SolutionManagment.Forms
                             }
                         };
                         var flows = svc.RetrieveMultiple(query).Entities.ToList();
-                        e.Result = new Tuple<ConnectionDetail, List<Entity>>(cd, flows);
+                        e.Result = new Tuple<ConnectionDetail, List<Entity>, string>(cd, flows, envId);
                     },
                     PostWorkCallBack = (e) =>
                     {
                         if (e.Error != null) return;
 
-                        var result = (Tuple<ConnectionDetail, List<Entity>>)e.Result;
+                        var result = (Tuple<ConnectionDetail, List<Entity>, string>)e.Result;
                         var tcd = result.Item1;
                         var targetFlows = result.Item2;
+                        var resolvedEnvId = result.Item3;
+
+                        if (!string.IsNullOrEmpty(resolvedEnvId))
+                            targetEnvironmentIds[tcd.ConnectionName] = resolvedEnvId;
 
                         var column = lvFlows.Columns.Cast<ColumnHeader>().FirstOrDefault(c => c.Text == tcd.ConnectionName);
                         if (column == null)
@@ -357,7 +387,75 @@ namespace err403.SolutionManagment.Forms
             }
         }
 
+        private string GetEnvironmentIdForColumn(int columnIndex)
+        {
+            if (columnIndex < 0) return sourceEnvironmentId;
+
+            var col = lvFlows.Columns.Cast<ColumnHeader>().ElementAtOrDefault(columnIndex);
+            if (col?.Tag is ConnectionDetail cd)
+            {
+                if (targetEnvironmentIds.TryGetValue(cd.ConnectionName, out var resolved))
+                    return resolved;
+                if (!string.IsNullOrEmpty(cd.EnvironmentId))
+                    return cd.EnvironmentId;
+            }
+
+            return sourceEnvironmentId;
+        }
+
+        private void OpenFlowInPowerAutomate(int columnIndex)
+        {
+            if (lvFlows.SelectedItems.Count == 0) return;
+
+            var envId = GetEnvironmentIdForColumn(columnIndex);
+            if (string.IsNullOrEmpty(envId))
+            {
+                MessageBox.Show("Environment ID is not available for this connection.",
+                    "Cannot Open", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            foreach (ListViewItem item in lvFlows.SelectedItems)
+            {
+                var wf = (Entity)item.Tag;
+                var flowId = wf.Id;
+                var url = $"https://make.powerapps.com/environments/{envId}/solutions/{DefaultSolutionId}/objects/cloudflows/{flowId}/view";
+
+                try
+                {
+                    Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Could not open browser:\n{ex.Message}",
+                        "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+        }
+
         #region Event handlers
+
+        private void LvFlows_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                var hit = lvFlows.HitTest(e.Location);
+                lastRightClickColumnIndex = hit.Item != null
+                    ? hit.SubItem != null ? hit.Item.SubItems.IndexOf(hit.SubItem) : 0
+                    : -1;
+            }
+        }
+
+        private void LvFlows_DoubleClick(object sender, EventArgs e)
+        {
+            if (lvFlows.SelectedItems.Count == 0) return;
+            RaiseActivateEvent(true);
+        }
+
+        private void MiOpenInPowerAutomate_Click(object sender, EventArgs e)
+        {
+            OpenFlowInPowerAutomate(lastRightClickColumnIndex);
+        }
 
         private void chkActiveOnly_CheckedChanged(object sender, EventArgs e)
         {

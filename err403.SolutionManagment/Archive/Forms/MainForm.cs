@@ -25,14 +25,46 @@ namespace err403.SolutionManagment.Forms
         internal System.Windows.Forms.Label lblSource;
         internal System.Windows.Forms.SplitContainer scOrganizations;
 
+        private string sourceEnvironmentId;
+
         public MainForm()
         {
             InitializeComponent();
+
+            var miOpenInMaker = new ToolStripMenuItem("Open in Maker Portal");
+            miOpenInMaker.Click += (s, ev) =>
+            {
+                if (string.IsNullOrEmpty(sourceEnvironmentId))
+                {
+                    MessageBox.Show(this, "Environment ID not available. Click 'Power Platform Auth' in the toolbar first.",
+                        "Authentication Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                foreach (ListViewItem item in lstSourceSolutions.SelectedItems)
+                {
+                    var solution = (Entity)item.Tag;
+                    var solutionId = solution.Id;
+                    var url = $"https://make.powerapps.com/environments/{sourceEnvironmentId}/solutions/{solutionId}";
+                    Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+                }
+            };
+
+            var ctxMenu = new ContextMenuStrip();
+            ctxMenu.Items.Add(miOpenInMaker);
+            ctxMenu.Opening += (s, ev) =>
+            {
+                miOpenInMaker.Enabled = lstSourceSolutions.SelectedItems.Count > 0
+                    && !string.IsNullOrEmpty(sourceEnvironmentId);
+            };
+            lstSourceSolutions.ContextMenuStrip = ctxMenu;
+        }
+
+        public void SetSourceEnvironment(string environmentId)
+        {
+            sourceEnvironmentId = environmentId;
         }
 
         public event EventHandler<TargetOrganizationsEventArgs> TargetOrganizationRemoved;
-
-        public event EventHandler TargetOrganizationRequested;
 
         public List<Entity> SelectedSolutions => lstSourceSolutions.SelectedItems.Cast<ListViewItem>()
             .Select(i => (Entity)i.Tag).ToList();

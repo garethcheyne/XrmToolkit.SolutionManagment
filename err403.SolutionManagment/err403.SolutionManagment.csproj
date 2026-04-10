@@ -76,11 +76,13 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppCode\ConnectionReferenceInfo.cs" />
     <Compile Include="AppCode\DownloadLogEventArgs.cs" />
     <Compile Include="AppCode\Enumerations.cs" />
+    <Compile Include="AppCode\EnvironmentIdResolver.cs" />
     <Compile Include="AppCode\Settings.cs" />
     <Compile Include="AppCode\SolutionHelper.cs" />
     <Compile Include="AppCode\TargetOrganizationsEventArgs.cs" />
@@ -92,22 +94,13 @@
     <Compile Include="Forms\CustomFolderBrowserDialog.designer.cs">
       <DependentUpon>CustomFolderBrowserDialog.cs</DependentUpon>
     </Compile>
-    <Compile Include="Forms\EnvironmentVariablesForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\EnvironmentVariablesForm.Designer.cs">
-      <DependentUpon>EnvironmentVariablesForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Forms\EnvVarEditPanel.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\CloudFlowsForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\CloudFlowsForm.Designer.cs">
-      <DependentUpon>CloudFlowsForm.cs</DependentUpon>
+    <Compile Include="Forms\WebUIHost.cs">
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Forms\FlowResultsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImportLogViewerForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\TransferEnvVarSummaryForm.cs">
@@ -119,29 +112,11 @@
     <Compile Include="Forms\AboutForm.Designer.cs">
       <DependentUpon>AboutForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="Forms\MainForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\MainForm.Designer.cs">
-      <DependentUpon>MainForm.cs</DependentUpon>
-    </Compile>
     <Compile Include="Forms\PreImportSummaryForm.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\PreImportSummaryForm.Designer.cs">
       <DependentUpon>PreImportSummaryForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Forms\ProgressForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\ProgressForm.Designer.cs">
-      <DependentUpon>ProgressForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Forms\SettingsForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\SettingsForm.Designer.cs">
-      <DependentUpon>SettingsForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Forms\UpdateVersionForm.cs">
       <SubType>Form</SubType>
@@ -149,7 +124,6 @@
     <Compile Include="Forms\UpdateVersionForm.Designer.cs">
       <DependentUpon>UpdateVersionForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="ListViewItemComparer.cs" />
     <Compile Include="MissingComponentsControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -162,13 +136,23 @@
     <Compile Include="MissingComponentsForm.Designer.cs">
       <DependentUpon>MissingComponentsForm.cs</DependentUpon>
     </Compile>
-    <Compile Include="Plugin.cs" />
-    <Compile Include="ProgressItem.cs">
+    <Compile Include="Forms\SettingsForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\SettingsForm.Designer.cs">
+      <DependentUpon>SettingsForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Types\ListViewItemComparer.cs" />
+    <Compile Include="Types\FlowTypes.cs" />
+    <Compile Include="Types\EnvVarTypes.cs" />
+    <Compile Include="Types\SettingsTypes.cs" />
+    <Compile Include="Types\ProgressItem.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="ProgressItem.Designer.cs">
+    <Compile Include="Types\ProgressItem.Designer.cs">
       <DependentUpon>ProgressItem.cs</DependentUpon>
     </Compile>
+    <Compile Include="Plugin.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
@@ -198,20 +182,11 @@
     <EmbeddedResource Include="Forms\CustomFolderBrowserDialog.resx">
       <DependentUpon>CustomFolderBrowserDialog.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="Forms\EnvironmentVariablesForm.resx">
-      <DependentUpon>EnvironmentVariablesForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Forms\MainForm.resx">
-      <DependentUpon>MainForm.cs</DependentUpon>
+    <EmbeddedResource Include="Forms\SettingsForm.resx">
+      <DependentUpon>SettingsForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\PreImportSummaryForm.resx">
       <DependentUpon>PreImportSummaryForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Forms\ProgressForm.resx">
-      <DependentUpon>ProgressForm.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Forms\SettingsForm.resx">
-      <DependentUpon>SettingsForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\UpdateVersionForm.resx">
       <DependentUpon>UpdateVersionForm.cs</DependentUpon>
@@ -222,7 +197,7 @@
     <EmbeddedResource Include="MissingComponentsForm.resx">
       <DependentUpon>MissingComponentsForm.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="ProgressItem.resx">
+    <EmbeddedResource Include="Types\ProgressItem.resx">
       <DependentUpon>ProgressItem.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="SolutionOrderDialog.resx">
@@ -322,6 +297,9 @@
     <PackageReference Include="XrmToolBoxPackage">
       <Version>1.2025.10.74</Version>
     </PackageReference>
+    <PackageReference Include="Microsoft.Web.WebView2">
+      <Version>1.0.3351.48</Version>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\Error64.png" />
@@ -342,6 +320,9 @@
     <Content Include="Resources\Icon.png" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Resources\WebUI.html">
+      <LogicalName>err403.SolutionManagment.Resources.WebUI.html</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="..\CHANGELOG.md">
       <Link>CHANGELOG.md</Link>
       <LogicalName>CHANGELOG.md</LogicalName>

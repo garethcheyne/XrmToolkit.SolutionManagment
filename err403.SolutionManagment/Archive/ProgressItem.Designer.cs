@@ -38,6 +38,7 @@ namespace err403.SolutionManagment
             this.pbProgress = new System.Windows.Forms.PictureBox();
             this.pnlProgress = new System.Windows.Forms.Panel();
             this.llDownloadLog = new System.Windows.Forms.LinkLabel();
+            this.llViewMessage = new System.Windows.Forms.LinkLabel();
             this.lblProgress = new System.Windows.Forms.Label();
             this.panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pbProgress)).BeginInit();
@@ -116,6 +117,7 @@ namespace err403.SolutionManagment
             // 
             // pnlProgress
             // 
+            this.pnlProgress.Controls.Add(this.llViewMessage);
             this.pnlProgress.Controls.Add(this.llDownloadLog);
             this.pnlProgress.Controls.Add(this.lblProgress);
             this.pnlProgress.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -138,6 +140,20 @@ namespace err403.SolutionManagment
             this.llDownloadLog.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             this.llDownloadLog.Visible = false;
             this.llDownloadLog.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.llDownloadLog_LinkClicked);
+            // 
+            // llViewMessage
+            // 
+            this.llViewMessage.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.llViewMessage.Location = new System.Drawing.Point(260, 7);
+            this.llViewMessage.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.llViewMessage.Name = "llViewMessage";
+            this.llViewMessage.Size = new System.Drawing.Size(155, 24);
+            this.llViewMessage.TabIndex = 9;
+            this.llViewMessage.TabStop = true;
+            this.llViewMessage.Text = "View message";
+            this.llViewMessage.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            this.llViewMessage.Visible = false;
+            this.llViewMessage.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.llViewMessage_LinkClicked);
             // 
             // lblProgress
             // 
@@ -182,6 +198,7 @@ namespace err403.SolutionManagment
         private System.Windows.Forms.Panel pnlProgress;
         private System.Windows.Forms.Label lblProgress;
         private System.Windows.Forms.LinkLabel llDownloadLog;
+        private System.Windows.Forms.LinkLabel llViewMessage;
         private System.Windows.Forms.Label lblPercentage;
     }
 }

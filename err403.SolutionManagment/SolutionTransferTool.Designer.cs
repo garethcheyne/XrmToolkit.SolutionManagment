@@ -19,12 +19,7 @@ namespace err403.SolutionManagment
             {
                 timer?.Stop();
                 timer?.Dispose();
-                mForm?.Close();
-                evForm?.Close();
-                cfForm?.Close();
-                pForm?.Close();
-                evEditPanel?.Close();
-                sForm?.Close();
+                cfForm?.Dispose();
                 components?.Dispose();
 
                 // Clean up toast notification images
@@ -56,6 +51,7 @@ namespace err403.SolutionManagment
             this.tssbTransfer = new System.Windows.Forms.ToolStripSplitButton();
             this.tsmiTransferWithOneTimeSettings = new System.Windows.Forms.ToolStripMenuItem();
             this.tsbCancel = new System.Windows.Forms.ToolStripButton();
+            this.tsbRefreshStatus = new System.Windows.Forms.ToolStripButton();
             this.tsbDownload = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
             this.tsbSwitchOrgs = new System.Windows.Forms.ToolStripButton();
@@ -74,6 +70,11 @@ namespace err403.SolutionManagment
             this.tsbRefreshFlows = new System.Windows.Forms.ToolStripButton();
             this.tsbActivateFlows = new System.Windows.Forms.ToolStripButton();
             this.tsbDeactivateFlows = new System.Windows.Forms.ToolStripButton();
+            this.tsbSettingsSeparator = new System.Windows.Forms.ToolStripSeparator();
+            this.tsbRefreshSettings = new System.Windows.Forms.ToolStripButton();
+            this.tsbSyncSelectedSettings = new System.Windows.Forms.ToolStripButton();
+            this.tsbSyncAllSettings = new System.Windows.Forms.ToolStripButton();
+            this.tsbGdsAuth = new System.Windows.Forms.ToolStripButton();
             this.toolStripSeparatorAbout = new System.Windows.Forms.ToolStripSeparator();
             this.tsbAbout = new System.Windows.Forms.ToolStripButton();
             this.imageList1 = new System.Windows.Forms.ImageList(this.components);
@@ -100,6 +101,7 @@ namespace err403.SolutionManagment
             this.toolStripSeparator1,
             this.tssbTransfer,
             this.tsbCancel,
+            this.tsbRefreshStatus,
             this.tsbImportFromFile,
             this.toolStripSeparator2,
             this.tsbDownload,
@@ -116,6 +118,11 @@ namespace err403.SolutionManagment
             this.tsbRefreshFlows,
             this.tsbActivateFlows,
             this.tsbDeactivateFlows,
+            this.tsbSettingsSeparator,
+            this.tsbRefreshSettings,
+            this.tsbSyncSelectedSettings,
+            this.tsbSyncAllSettings,
+            this.tsbGdsAuth,
             this.toolStripSeparatorAbout,
             this.tsbAbout});
             this.tsMain.Location = new System.Drawing.Point(0, 0);
@@ -166,6 +173,17 @@ namespace err403.SolutionManagment
             this.tsbCancel.Text = "Cancel";
             this.tsbCancel.Visible = false;
             this.tsbCancel.Click += new System.EventHandler(this.tsbCancel_Click);
+            // 
+            // tsbRefreshStatus
+            // 
+            this.tsbRefreshStatus.Image = global::err403.SolutionManagment.Properties.Resources.Solutions32;
+            this.tsbRefreshStatus.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbRefreshStatus.Name = "tsbRefreshStatus";
+            this.tsbRefreshStatus.Size = new System.Drawing.Size(125, 36);
+            this.tsbRefreshStatus.Text = "Refresh Status";
+            this.tsbRefreshStatus.ToolTipText = "Force re-check progress of in-flight operations";
+            this.tsbRefreshStatus.Visible = false;
+            this.tsbRefreshStatus.Click += new System.EventHandler(this.tsbRefreshStatus_Click);
             // 
             // tsbDownload
             // 
@@ -315,6 +333,53 @@ namespace err403.SolutionManagment
             this.tsbDeactivateFlows.Visible = false;
             this.tsbDeactivateFlows.Click += new System.EventHandler(this.tsbDeactivateFlows_Click);
             // 
+            // tsbSettingsSeparator
+            // 
+            this.tsbSettingsSeparator.Name = "tsbSettingsSeparator";
+            this.tsbSettingsSeparator.Size = new System.Drawing.Size(6, 39);
+            this.tsbSettingsSeparator.Visible = false;
+            // 
+            // tsbRefreshSettings
+            // 
+            this.tsbRefreshSettings.Image = global::err403.SolutionManagment.Properties.Resources.Solutions32;
+            this.tsbRefreshSettings.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbRefreshSettings.Name = "tsbRefreshSettings";
+            this.tsbRefreshSettings.Size = new System.Drawing.Size(143, 36);
+            this.tsbRefreshSettings.Text = "Refresh";
+            this.tsbRefreshSettings.Visible = false;
+            this.tsbRefreshSettings.Click += new System.EventHandler(this.tsbRefreshSettings_Click);
+            // 
+            // tsbSyncSelectedSettings
+            // 
+            this.tsbSyncSelectedSettings.Image = global::err403.SolutionManagment.Properties.Resources.Startup32;
+            this.tsbSyncSelectedSettings.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbSyncSelectedSettings.Name = "tsbSyncSelectedSettings";
+            this.tsbSyncSelectedSettings.Size = new System.Drawing.Size(143, 36);
+            this.tsbSyncSelectedSettings.Text = "Sync Selected";
+            this.tsbSyncSelectedSettings.Visible = false;
+            this.tsbSyncSelectedSettings.Click += new System.EventHandler(this.tsbSyncSelectedSettings_Click);
+            // 
+            // tsbSyncAllSettings
+            // 
+            this.tsbSyncAllSettings.Image = global::err403.SolutionManagment.Properties.Resources.Startup32;
+            this.tsbSyncAllSettings.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbSyncAllSettings.Name = "tsbSyncAllSettings";
+            this.tsbSyncAllSettings.Size = new System.Drawing.Size(143, 36);
+            this.tsbSyncAllSettings.Text = "Sync All Diffs";
+            this.tsbSyncAllSettings.Visible = false;
+            this.tsbSyncAllSettings.Click += new System.EventHandler(this.tsbSyncAllSettings_Click);
+            // 
+            // tsbGdsAuth
+            // 
+            this.tsbGdsAuth.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            this.tsbGdsAuth.Image = global::err403.SolutionManagment.Properties.Resources.PowerAppsLogo;
+            this.tsbGdsAuth.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.tsbGdsAuth.Name = "tsbGdsAuth";
+            this.tsbGdsAuth.Size = new System.Drawing.Size(200, 36);
+            this.tsbGdsAuth.Text = "Power Platform Auth";
+            this.tsbGdsAuth.ToolTipText = "Sign in to Power Platform for maker portal links";
+            this.tsbGdsAuth.Click += new System.EventHandler(this.tsbGdsAuth_Click);
+            // 
             // toolStripSeparatorAbout
             // 
             this.toolStripSeparatorAbout.Name = "toolStripSeparatorAbout";
@@ -408,7 +473,7 @@ namespace err403.SolutionManagment
             this.btnAddTarget.Text = "Add";
             this.btnAddTarget.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             this.btnAddTarget.UseVisualStyleBackColor = true;
-            this.btnAddTarget.Click += new System.EventHandler(this.btnAddTarget_Click);
+            // btnAddTarget_Click removed — React handles Add Target
             // 
             // dpMain
             // 
@@ -460,6 +525,7 @@ namespace err403.SolutionManagment
         private ToolStripButton tsbExportSolutions;
         private ToolStripButton tsbDownload;
         private ToolStripButton tsbCancel;
+        private ToolStripButton tsbRefreshStatus;
         private ToolStripSplitButton tssbTransfer;
         private ToolStripMenuItem tsmiTransferWithOneTimeSettings;
         private ToolStripSeparator toolStripSeparator5;
@@ -473,6 +539,11 @@ namespace err403.SolutionManagment
         private ToolStripButton tsbRefreshFlows;
         private ToolStripButton tsbActivateFlows;
         private ToolStripButton tsbDeactivateFlows;
+        private ToolStripSeparator tsbSettingsSeparator;
+        private ToolStripButton tsbRefreshSettings;
+        private ToolStripButton tsbSyncSelectedSettings;
+        private ToolStripButton tsbSyncAllSettings;
+        private ToolStripButton tsbGdsAuth;
         private ToolStripSeparator toolStripSeparatorAbout;
         private ToolStripButton tsbAbout;
         internal System.Windows.Forms.SplitContainer scOrganizations;

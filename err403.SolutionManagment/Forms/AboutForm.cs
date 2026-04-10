@@ -14,6 +14,7 @@ namespace err403.SolutionManagment.Forms
         {
             InitializeComponent();
             LoadChangelog();
+            LoadPowerPlatformInfo();
         }
 
         private void LoadChangelog()
@@ -120,6 +121,64 @@ namespace err403.SolutionManagment.Forms
             // Italic *text*
             text = Regex.Replace(text, @"\*(.+?)\*", "<em>$1</em>");
             return text;
+        }
+
+        private void LoadPowerPlatformInfo()
+        {
+            var hasToken = AppCode.EnvironmentIdResolver.HasGdsToken;
+            var status = hasToken
+                ? "<span style='color:green;font-weight:bold'>✓ Authenticated</span>"
+                : "<span style='color:orange;font-weight:bold'>⚠ Not authenticated</span>";
+
+            var html = new StringBuilder();
+            html.Append("<html><head><style>");
+            html.Append("body{font-family:'Segoe UI',sans-serif;font-size:13px;margin:16px;color:#222}");
+            html.Append("h2{font-size:16px;color:#742774;margin-top:0}");
+            html.Append("h3{font-size:14px;margin-top:16px;color:#333}");
+            html.Append("ul{margin:6px 0 6px 20px;padding:0}");
+            html.Append("li{margin:4px 0}");
+            html.Append(".status{font-size:14px;margin:12px 0;padding:8px 12px;background:#f5f5f5;border-radius:4px}");
+            html.Append(".note{font-size:12px;color:#666;margin-top:16px;padding:8px;background:#fefce8;border-left:3px solid #d97706;border-radius:2px}");
+            html.Append("</style></head><body>");
+
+            html.Append("<h2>Power Platform Authentication</h2>");
+
+            html.Append("<div class='status'>Current status: ").Append(status).Append("</div>");
+
+            html.Append("<h3>Why is a separate sign-in needed?</h3>");
+            html.Append("<p>XrmToolBox connects to the <strong>Dataverse API</strong> for solution management. ");
+            html.Append("However, features like opening solutions or flows in the Power Platform Maker Portal ");
+            html.Append("require the <strong>Environment ID</strong>, which is only available from the ");
+            html.Append("<strong>Global Discovery Service</strong> — a separate Microsoft API that requires its own authentication token.</p>");
+
+            html.Append("<p>For federated/SSO accounts (like yours), the Dataverse credentials cannot be reused ");
+            html.Append("for the Discovery Service, so a one-time browser sign-in is required.</p>");
+
+            html.Append("<h3>What does this enable?</h3>");
+            html.Append("<ul>");
+            html.Append("<li><strong>Solutions tab:</strong> Right-click any solution → <em>Open in Maker Portal</em> — ");
+            html.Append("opens the solution directly in make.powerapps.com</li>");
+            html.Append("<li><strong>Cloud Flows tab:</strong> Right-click any flow → <em>Open in Power Automate</em> — ");
+            html.Append("opens the flow in the Power Automate designer</li>");
+            html.Append("<li><strong>Environment ID resolution:</strong> Maps your Dataverse org URL to the ");
+            html.Append("Power Platform Environment ID via the Global Discovery Service</li>");
+            html.Append("</ul>");
+
+            html.Append("<h3>Security</h3>");
+            html.Append("<ul>");
+            html.Append("<li>The token is encrypted using <strong>Windows DPAPI</strong> (CurrentUser scope) and stored locally</li>");
+            html.Append("<li>Only <em>your</em> Windows account can decrypt it — other users on the machine cannot</li>");
+            html.Append("<li>The token is scoped to the Global Discovery Service only — it cannot modify your Dataverse data</li>");
+            html.Append("<li>Tokens expire automatically (typically ~1 hour) and are refreshed silently when possible</li>");
+            html.Append("</ul>");
+
+            html.Append("<div class='note'>💡 Click the <strong>Power Platform Auth</strong> button in the toolbar to sign in. ");
+            html.Append("Once authenticated, the button changes to <strong>Authenticated ✓</strong>. ");
+            html.Append("The token persists across sessions so you usually only need to sign in once.</div>");
+
+            html.Append("</body></html>");
+
+            wbPowerPlatform.DocumentText = html.ToString();
         }
 
         private void lnkOriginalRepo_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)

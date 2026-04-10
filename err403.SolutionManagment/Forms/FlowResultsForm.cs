@@ -12,6 +12,7 @@ namespace err403.SolutionManagment.Forms
         public string FlowName { get; set; }
         public string TargetName { get; set; }
         public string TargetOrgUrl { get; set; }
+        public string TargetEnvironmentId { get; set; }
         public Guid? TargetFlowId { get; set; }
         public bool Success { get; set; }
         public bool IsConnectionRefError { get; set; }
@@ -20,6 +21,7 @@ namespace err403.SolutionManagment.Forms
 
     public class FlowResultsForm : Form
     {
+        private const string DefaultSolutionId = "fd140aaf-4df4-11dd-bd17-0019b9312238";
         private ListView lvResults;
         private Button btnClose;
         private Button btnOpenSelected;
@@ -164,11 +166,11 @@ namespace err403.SolutionManagment.Forms
             foreach (ListViewItem item in lvResults.SelectedItems)
             {
                 var result = (FlowToggleResult)item.Tag;
-                if (result.TargetFlowId.HasValue && !string.IsNullOrEmpty(result.TargetOrgUrl))
+                if (result.TargetFlowId.HasValue && !string.IsNullOrEmpty(result.TargetEnvironmentId))
                 {
                     try
                     {
-                        var url = $"{result.TargetOrgUrl.TrimEnd('/')}/main.aspx?pagetype=entityrecord&etn=workflow&id={result.TargetFlowId.Value}";
+                        var url = $"https://make.powerapps.com/environments/{result.TargetEnvironmentId}/solutions/{DefaultSolutionId}/objects/cloudflows/{result.TargetFlowId.Value}/view";
                         Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
                     }
                     catch (Exception ex)
