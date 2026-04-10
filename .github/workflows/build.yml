@@ -9,9 +9,6 @@ on:
 jobs:
   BuildSolution:
     runs-on: windows-latest
-    permissions:
-      contents: read
-      packages: write
 
     env:
       ToolName: 'err403.SolutionManagment'
@@ -61,9 +58,8 @@ jobs:
           name: drop
           path: ${{ github.workspace }}/artifacts/**/*.nupkg
 
-      - name: Publish to GitHub Packages
+      - name: Publish to NuGet.org
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
-          dotnet nuget add source "https://nuget.pkg.github.com/garethcheyne/index.json" --name github --username garethcheyne --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text
-          Get-ChildItem "${{ github.workspace }}/artifacts/*.nupkg" | ForEach-Object { dotnet nuget push $_.FullName --source github --skip-duplicate }
+          Get-ChildItem "${{ github.workspace }}/artifacts/*.nupkg" | ForEach-Object { nuget push $_.FullName -Source https://api.nuget.org/v3/index.json -ApiKey ${{ secrets.NUGET_API_KEY }} -SkipDuplicate }
         shell: pwsh
