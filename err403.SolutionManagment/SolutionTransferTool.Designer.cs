@@ -26,6 +26,16 @@ namespace err403.SolutionManagment
                 evEditPanel?.Close();
                 sForm?.Close();
                 components?.Dispose();
+
+                // Clean up toast notification images
+                try
+                {
+                    var successPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "xtb.stt.success.png");
+                    var errorPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "xtb.stt.error.png");
+                    if (System.IO.File.Exists(successPath)) System.IO.File.Delete(successPath);
+                    if (System.IO.File.Exists(errorPath)) System.IO.File.Delete(errorPath);
+                }
+                catch { }
             }
             base.Dispose(disposing);
         }

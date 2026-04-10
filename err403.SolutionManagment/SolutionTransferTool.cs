@@ -1232,7 +1232,7 @@ New version: {computedNewVersion}",
                 }
             }
 
-            if (!(oneTimeSettings ?? settings).Managed && (oneTimeSettings ?? settings).Publish)
+            if ((oneTimeSettings ?? settings).Publish)
             {
                 foreach (var detail in AdditionalConnectionDetails)
                 {

@@ -195,16 +195,20 @@ namespace err403.SolutionManagment
                 lstMissingComponents.Items.Add(item);
             }
 
-            Show();
+            ShowDialog();
         }
 
         private void btnFixMissing_Click(Object sender, EventArgs e)
         {
+            var skipped = 0;
             foreach (ListViewItem item in lstMissingComponents.Items)
             {
                 var typedTag = (Tuple<int, Guid>)item.Tag;
                 if (typedTag.Item2 == Guid.Empty)
+                {
+                    skipped++;
                     continue;
+                }
                 try
                 {
                     item.BackColor = Color.Yellow;
@@ -230,7 +234,11 @@ namespace err403.SolutionManagment
 
             _sourceService.Execute(new PublishAllXmlRequest());
 
-            MessageBox.Show("Missing components were successfully added to solution", "Success", MessageBoxButtons.OK);
+            var msg = "Missing components were successfully added to solution.";
+            if (skipped > 0)
+                msg += $"\n\n{skipped} component(s) could not be resolved (shown in red) and were skipped.";
+
+            MessageBox.Show(msg, "Complete", MessageBoxButtons.OK, skipped > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
             Dispose();
         }
     }
