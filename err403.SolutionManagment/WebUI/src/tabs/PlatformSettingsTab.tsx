@@ -18,15 +18,15 @@ import type { TargetConnection } from '../types';
 const useStyles = makeStyles({
   root: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' },
   toolbar: {
-    padding: '4px 8px', borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
+    padding: '4px 8px 4px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
     backgroundColor: tokens.colorNeutralBackground2, flexShrink: 0,
   },
   searchRow: {
     display: 'flex', alignItems: 'center', gap: '12px',
-    padding: '6px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
+    padding: '4px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
     backgroundColor: tokens.colorNeutralBackground2, flexShrink: 0,
   },
-  searchBox: { flexGrow: 1, maxWidth: '320px' },
+  searchBox: { flex: '1 1 auto', maxWidth: '280px', minWidth: '150px' },
   gridContainer: { flex: 1, overflow: 'auto', padding: '0 8px' },
   headerCell: { fontWeight: 700, fontSize: '12px', backgroundColor: tokens.colorNeutralBackground3 },
   boolTrue: { color: tokens.colorPaletteGreenForeground1, fontWeight: 600 },
@@ -43,11 +43,11 @@ const useStyles = makeStyles({
   },
   settingRow: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '6px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    padding: '4px 12px', borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     gap: '12px',
   },
-  settingName: { flex: 1, minWidth: 0 },
-  settingValue: { width: '200px', flexShrink: 0 },
+  settingName: { flex: '0 0 45%', minWidth: 0, overflow: 'hidden' },
+  settingValue: { flex: '1 1 55%', minWidth: '150px' },
   groupHeader: { fontWeight: 600 },
 });
 

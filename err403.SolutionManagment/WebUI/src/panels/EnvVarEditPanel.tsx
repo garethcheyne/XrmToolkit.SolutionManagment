@@ -12,19 +12,22 @@ import { postMessage } from '../bridge';
 
 const useStyles = makeStyles({
   drawer: {
-    width: '420px',
-    minWidth: '420px',
+    width: '380px',
+    minWidth: '380px',
     borderLeft: `1px solid ${tokens.colorNeutralStroke1}`,
+    overflowY: 'auto',
   },
   body: {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
+    padding: '4px 0',
   },
   sourceSection: {
     padding: '8px',
     backgroundColor: tokens.colorNeutralBackground3,
     borderRadius: '6px',
+    '& input, & textarea': { width: '100%' },
   },
   targetSection: {
     display: 'flex',
@@ -38,6 +41,7 @@ const useStyles = makeStyles({
     padding: '8px',
     backgroundColor: tokens.colorNeutralBackground3,
     borderRadius: '6px',
+    '& input, & textarea': { width: '100%' },
   },
   footer: {
     display: 'flex',
@@ -129,7 +133,7 @@ export function EnvVarEditPanel({ open, onClose, variable, targets, targetEnvVar
             {isJson ? (
               <Textarea value={variable.currentValue || '(default)'} readOnly rows={4} resize="vertical" />
             ) : (
-              <Input value={variable.currentValue || '(default)'} readOnly />
+              <Input  value={variable.currentValue || '(default)'} readOnly />
             )}
           </div>
         </Field>

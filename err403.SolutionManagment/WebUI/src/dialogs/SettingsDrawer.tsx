@@ -13,24 +13,22 @@ import {
 
 const useStyles = makeStyles({
   drawer: {
-    width: '320px',
-    minWidth: '320px',
+    width: '300px',
+    minWidth: '300px',
     borderLeft: `1px solid ${tokens.colorNeutralStroke1}`,
-    overflowX: 'visible',
     overflowY: 'auto',
   },
   body: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0px',
-    overflow: 'visible',
-    padding: '12px 16px',
+    gap: '4px',
+    padding: '8px 12px',
   },
   settingRow: {
-    paddingLeft: '0px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '0px',
+    gap: '2px',
+    paddingBottom: '4px',
   },
 });
 

@@ -110,7 +110,7 @@ export function ProgressPanel({ items, visible, showRetry }: ProgressPanelProps)
               <div className={styles.itemHeader}>
                 {item.status === 'success' && <CheckmarkCircleFilled className={styles.successIcon} fontSize={16} />}
                 {item.status === 'error' && <DismissCircleFilled className={styles.errorIcon} fontSize={16} />}
-                <Text className={styles.itemAction} truncate wrap={false}>{item.action}</Text>
+                <Text className={styles.itemAction} truncate wrap={false} title={item.action}>{item.action}</Text>
               </div>
               <Text className={styles.itemDirection}>{item.direction}</Text>
 
