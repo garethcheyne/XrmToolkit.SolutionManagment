@@ -177,11 +177,11 @@ namespace err403.SolutionManagment.Forms
                 switch (action)
                 {
                     case "activateFlows":
-                        RaiseFlowActivateEvent(true);
+                        RaiseFlowEvent(msg, true);
                         break;
 
                     case "deactivateFlows":
-                        RaiseFlowActivateEvent(false);
+                        RaiseFlowEvent(msg, false);
                         break;
 
                     case "refreshFlows":
@@ -406,6 +406,31 @@ namespace err403.SolutionManagment.Forms
         {
             var json = await webView.CoreWebView2.ExecuteScriptAsync("window.bridge.getSelectedSolutions?.() ?? '[]'");
             return JsonConvert.DeserializeObject<string>(json) ?? "[]";
+        }
+
+        private void RaiseFlowEvent(Dictionary<string, object> msg, bool activate)
+        {
+            if (!msg.ContainsKey("flows")) return;
+            var flows = JsonConvert.DeserializeObject<List<SelectedFlowDto>>(msg["flows"].ToString());
+            if (flows == null || flows.Count == 0) return;
+
+            var args = new FlowActivateRequestedEventArgs { Activate = activate };
+            foreach (var sf in flows)
+            {
+                var flowData = currentFlows.FirstOrDefault(f => f.WorkflowId == sf.WorkflowId);
+                args.Flows.Add(new FlowActionItem
+                {
+                    FlowName = sf.Name,
+                    WorkflowId = Guid.Parse(sf.WorkflowId),
+                    Workflow = flowData?.Entity,
+                    Item = null
+                });
+            }
+
+            if (activate)
+                ActivateRequested?.Invoke(this, args);
+            else
+                DeactivateRequested?.Invoke(this, args);
         }
 
         private async void RaiseFlowActivateEvent(bool activate)
