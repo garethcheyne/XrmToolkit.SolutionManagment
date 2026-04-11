@@ -31,11 +31,16 @@ export interface TransferResult {
 }
 
 export interface FlowResult {
-  flowName: string;
-  targetName: string;
-  success: boolean;
-  errorMessage: string;
-  isConnectionRefError: boolean;
+  FlowName: string;
+  TargetName: string;
+  Success: boolean;
+  ErrorMessage: string;
+  IsConnectionRefError: boolean;
+  // Aliases for React display
+  flowName?: string;
+  targetName?: string;
+  success?: boolean;
+  errorMessage?: string;
 }
 
 // ── Bridge message types ──

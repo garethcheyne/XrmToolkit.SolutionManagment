@@ -20,6 +20,7 @@ import { EnvironmentVarsTab } from './tabs/EnvironmentVarsTab';
 import { CloudFlowsTab } from './tabs/CloudFlowsTab';
 import { PlatformSettingsTab } from './tabs/PlatformSettingsTab';
 import { ConnectionBar } from './components/ConnectionBar';
+import { AboutDialog } from './dialogs/AboutDialog';
 import { ProgressPanel, type ProgressItemData } from './panels/ProgressPanel';
 import { defaultSettings, type PluginSettings } from './dialogs/SettingsDrawer';
 import { setBridgeHandler, postMessage } from './bridge';
@@ -73,15 +74,21 @@ export function App() {
   const [progressItems, setProgressItems] = useState<ProgressItemData[]>([]);
   const [progressVisible, setProgressVisible] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [targetSolutionData, setTargetSolutionData] = useState<Record<string, Array<{ uniquename: string; version: string; ismanaged: boolean }>>>({});
   const [targetFlowData, setTargetFlowData] = useState<Record<string, Array<{ name: string; statecode: number; statuscode: number }>>>({});
   const [targetEnvVarData, setTargetEnvVarData] = useState<Record<string, Array<{ schemaname: string; value: string; exists: boolean }>>>({});
   const [pluginSettings, setPluginSettings] = useState<PluginSettings>(defaultSettings);
 
   const updateItem = useCallback((updated: ProgressItemData) => {
-    setProgressItems((prev) =>
-      prev.map((item) => (item.id === updated.id ? updated : item))
-    );
+    setProgressItems((prev) => {
+      const exists = prev.some((item) => item.id === updated.id);
+      if (exists) {
+        return prev.map((item) => (item.id === updated.id ? updated : item));
+      }
+      return [...prev, updated];
+    });
+    setProgressVisible(true);
   }, []);
 
   useEffect(() => {
@@ -180,7 +187,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <FluentProvider theme={webLightTheme}>
         <div className={styles.root}>
-          <ConnectionBar source={source} targets={targets} />
+          <ConnectionBar source={source} targets={targets} onAbout={() => setAboutOpen(true)} />
           <div className={styles.tabBar}>
             <TabList
               selectedValue={activeTab}
@@ -216,6 +223,7 @@ export function App() {
             />
           </div>
         </div>
+        <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       </FluentProvider>
     </QueryClientProvider>
   );

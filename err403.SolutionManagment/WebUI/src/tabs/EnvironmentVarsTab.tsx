@@ -11,6 +11,7 @@ import { TableSkeleton } from '../components/TableSkeleton';
 import { useQuery } from '@tanstack/react-query';
 import { getEnvVarDefinitions, getEnvVarValues } from '../dataverse';
 import { getAuth } from '../auth';
+import { EnvVarEditPanel } from '../panels/EnvVarEditPanel';
 import type { TargetConnection } from '../types';
 
 const useStyles = makeStyles({
@@ -74,6 +75,7 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
   const [search, setSearch] = useState('');
   const [showSchema, setShowSchema] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<SelectionItemId>>(new Set());
+  const [editVar, setEditVar] = useState<EnvVarRow | null>(null);
 
   const { data: definitions = [], isLoading: loadingDefs, refetch: refetchDefs } = useQuery({
     queryKey: ['envVarDefs', auth?.orgUrl],
@@ -184,7 +186,16 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
       <Toolbar className={styles.toolbar} size="small">
         <ToolbarButton icon={<ArrowSyncRegular />} onClick={() => { refetchDefs(); refetchVals(); }}>Refresh</ToolbarButton>
         <ToolbarDivider />
-        <ToolbarButton icon={<ArrowUploadRegular />} disabled={selectedItems.size === 0}>Transfer Selected</ToolbarButton>
+        <ToolbarButton icon={<ArrowUploadRegular />} disabled={selectedItems.size === 0}
+          onClick={() => {
+            const selected = filteredRows.filter(r => selectedItems.has(r.definitionId));
+            if (selected.length > 0) {
+              import('../bridge').then(b => b.postMessage({
+                action: 'startTransfer' as never,
+                items: selected.map(r => ({ schemaName: r.schemaName, displayName: r.displayName, sourceValue: r.currentValue, definitionId: r.definitionId })),
+              } as never));
+            }
+          }}>Transfer Selected</ToolbarButton>
       </Toolbar>
 
       <div className={styles.searchRow}>
@@ -197,29 +208,38 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
         </Badge>
       </div>
 
-      {filteredRows.length === 0 ? (
-        <div className={styles.emptyState}>
-          <Text size={400} weight="semibold">{!auth ? 'Not connected' : 'No environment variables found'}</Text>
-          <Text size={200}>{!auth ? 'Connect to a source environment first.' : 'Try adjusting your search.'}</Text>
-        </div>
-      ) : (
-        <div className={styles.gridContainer}>
-          <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
-            selectedItems={selectedItems} onSelectionChange={onSelectionChange}
-            getRowId={(item) => item.definitionId} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
-            <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
-              <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
-            </DataGridHeader>
-            <DataGridBody<EnvVarRow>>
-              {({ item, rowId }) => (
-                <DataGridRow<EnvVarRow> key={rowId}>
-                  {({ renderCell }) => <DataGridCell>{renderCell(item)}</DataGridCell>}
-                </DataGridRow>
-              )}
-            </DataGridBody>
-          </DataGrid>
-        </div>
-      )}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {filteredRows.length === 0 ? (
+          <div className={styles.emptyState}>
+            <Text size={400} weight="semibold">{!auth ? 'Not connected' : 'No environment variables found'}</Text>
+            <Text size={200}>{!auth ? 'Connect to a source environment first.' : 'Try adjusting your search.'}</Text>
+          </div>
+        ) : (
+          <div className={styles.gridContainer}>
+            <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
+              selectedItems={selectedItems} onSelectionChange={onSelectionChange}
+              getRowId={(item) => item.definitionId} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
+              <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
+                <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
+              </DataGridHeader>
+              <DataGridBody<EnvVarRow>>
+                {({ item, rowId }) => (
+                  <DataGridRow<EnvVarRow> key={rowId} onDoubleClick={() => setEditVar(item)}>
+                    {({ renderCell }) => <DataGridCell>{renderCell(item)}</DataGridCell>}
+                  </DataGridRow>
+                )}
+              </DataGridBody>
+            </DataGrid>
+          </div>
+        )}
+        <EnvVarEditPanel
+          open={!!editVar}
+          onClose={() => setEditVar(null)}
+          variable={editVar}
+          targets={targets}
+          targetEnvVarData={targetEnvVarData}
+        />
+      </div>
     </div>
   );
 }

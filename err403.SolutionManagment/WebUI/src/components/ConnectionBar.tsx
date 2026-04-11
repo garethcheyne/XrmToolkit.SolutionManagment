@@ -80,9 +80,10 @@ const useStyles = makeStyles({
 interface ConnectionBarProps {
   source: SourceConnection;
   targets: TargetConnection[];
+  onAbout?: () => void;
 }
 
-export function ConnectionBar({ source, targets }: ConnectionBarProps) {
+export function ConnectionBar({ source, targets, onAbout }: ConnectionBarProps) {
   const styles = useStyles();
 
   return (
@@ -139,6 +140,11 @@ export function ConnectionBar({ source, targets }: ConnectionBarProps) {
           </Button>
         </Tooltip>
       </div>
+      {onAbout && (
+        <Button size="small" appearance="subtle" onClick={onAbout} style={{ marginLeft: '4px' }}>
+          About
+        </Button>
+      )}
     </div>
   );
 }

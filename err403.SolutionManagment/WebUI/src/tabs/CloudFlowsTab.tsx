@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DataGrid, DataGridHeader, DataGridRow, DataGridHeaderCell,
   DataGridBody, DataGridCell, createTableColumn,
   type TableColumnDefinition, type DataGridProps,
   SearchBox, Dropdown, Option, Switch, Text, Toolbar, ToolbarButton, ToolbarDivider,
-  Badge, Menu, MenuTrigger, MenuPopover, MenuList, MenuItem,
+  Badge, Menu, MenuTrigger, MenuPopover, MenuList, MenuItem, Tooltip,
   tokens, makeStyles, type SelectionItemId,
 } from '@fluentui/react-components';
 import {
@@ -14,8 +14,9 @@ import { TableSkeleton } from '../components/TableSkeleton';
 import { useQuery } from '@tanstack/react-query';
 import { getCloudFlows } from '../dataverse';
 import { getAuth } from '../auth';
-import { postMessage } from '../bridge';
+import { postMessage, setBridgeHandler } from '../bridge';
 import { StatusPill } from '../components/StatusPill';
+import { FlowResultsDialog } from '../dialogs/FlowResultsDialog';
 import type { TargetConnection } from '../types';
 
 const useStyles = makeStyles({
@@ -83,6 +84,16 @@ export function CloudFlowsTab({ targets, targetFlowData }: CloudFlowsTabProps) {
   const [activeOnly, setActiveOnly] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<SelectionItemId>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ flowId: string; x: number; y: number } | null>(null);
+  const [flowResults, setFlowResults] = useState<Array<{ FlowName: string; TargetName: string; Success: boolean; ErrorMessage: string }>>([]);
+  const [resultsOpen, setResultsOpen] = useState(false);
+
+  useEffect(() => {
+    setBridgeHandler('flowResults', (json: string) => {
+      const results = JSON.parse(json);
+      setFlowResults(results);
+      setResultsOpen(true);
+    });
+  }, []);
 
   const { data: workflows = [], isLoading, refetch } = useQuery({
     queryKey: ['cloudFlows', auth?.orgUrl],
@@ -152,8 +163,21 @@ export function CloudFlowsTab({ targets, targetFlowData }: CloudFlowsTabProps) {
           if (!tFlows) return <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>—</Text>;
           const match = tFlows.find(f => f.name === item.name);
           if (!match) return <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>not found</Text>;
-          const targetStatus = match.statecode === 1 ? 'On' : match.statecode === 2 ? 'Suspended' : 'Off';
-          return <StatusPill status={targetStatus} stateCode={match.statecode} />;
+          const isOn = match.statecode === 1;
+          return (
+            <Tooltip content={`Click to ${isOn ? 'deactivate' : 'activate'} on ${t.name}`} relationship="label">
+              <Switch
+                checked={isOn}
+                onChange={() => {
+                  postMessage({
+                    action: isOn ? 'deactivateFlows' : 'activateFlows',
+                    flows: [{ name: item.name, workflowId: item.workflowId, stateCode: item.stateCode }],
+                  });
+                }}
+                label={isOn ? 'On' : 'Off'}
+              />
+            </Tooltip>
+          );
         },
       }));
     }
@@ -235,6 +259,12 @@ export function CloudFlowsTab({ targets, targetFlowData }: CloudFlowsTabProps) {
           </Menu>
         </div>
       )}
+
+      <FlowResultsDialog
+        results={flowResults.map(r => ({ flowName: r.FlowName, targetName: r.TargetName, success: r.Success, errorMessage: r.ErrorMessage, FlowName: r.FlowName, TargetName: r.TargetName, Success: r.Success, ErrorMessage: r.ErrorMessage, IsConnectionRefError: false }))}
+        open={resultsOpen}
+        onClose={() => setResultsOpen(false)}
+      />
     </div>
   );
 }
