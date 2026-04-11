@@ -639,6 +639,23 @@ namespace err403.SolutionManagment.Forms
                 $"{JsonConvert.SerializeObject(errorWarning ?? "")})");
         }
 
+        // ── Public API: Results from C# services ──
+
+        public void SendFlowResults(string json)
+        {
+            ExecuteScript($"window.bridge.flowResults?.({JsonConvert.SerializeObject(json)})");
+        }
+
+        public void SendTransferResult(string json)
+        {
+            ExecuteScript($"window.bridge.transferResult?.({JsonConvert.SerializeObject(json)})");
+        }
+
+        public void SendMissingDeps(string json)
+        {
+            ExecuteScript($"window.bridge.missingDeps?.({JsonConvert.SerializeObject(json)})");
+        }
+
         public void SetActiveTab(string tab)
         {
             ExecuteScript($"window.bridge.setActiveTab({JsonConvert.SerializeObject(tab)})");

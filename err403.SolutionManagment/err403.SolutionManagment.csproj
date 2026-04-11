@@ -79,55 +79,23 @@
     <Reference Include="System.Net.Http" />
   </ItemGroup>
   <ItemGroup>
-    <!-- AppCode: business logic helpers -->
-    <Compile Include="AppCode\ConnectionReferenceInfo.cs" />
-    <Compile Include="AppCode\DownloadLogEventArgs.cs" />
+    <!-- AppCode -->
     <Compile Include="AppCode\Enumerations.cs" />
     <Compile Include="AppCode\EnvironmentIdResolver.cs" />
     <Compile Include="AppCode\Settings.cs" />
-    <Compile Include="AppCode\SolutionHelper.cs" />
-    <Compile Include="AppCode\TargetOrganizationsEventArgs.cs" />
     <Compile Include="AppCode\VersionTypeConverter.cs" />
     <None Include="err403.SolutionManagment.nuspec" />
-    <!-- Forms: WebUIHost + modal dialogs for SDK operations -->
-    <Compile Include="Forms\WebUIHost.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Include="Forms\AboutForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Forms\AboutForm.Designer.cs">
-      <DependentUpon>AboutForm.cs</DependentUpon>
-    </Compile>
-    <Compile Include="Forms\SettingsForm.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="Forms\SettingsForm.Designer.cs"><DependentUpon>SettingsForm.cs</DependentUpon></Compile>
-    <Compile Include="Forms\PreImportSummaryForm.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="Forms\PreImportSummaryForm.Designer.cs"><DependentUpon>PreImportSummaryForm.cs</DependentUpon></Compile>
-    <Compile Include="Forms\FlowResultsForm.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="Forms\UpdateVersionForm.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="Forms\UpdateVersionForm.Designer.cs"><DependentUpon>UpdateVersionForm.cs</DependentUpon></Compile>
-    <Compile Include="Forms\ImportLogViewerForm.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="Forms\TransferEnvVarSummaryForm.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="Forms\CustomFolderBrowserDialog.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="Forms\CustomFolderBrowserDialog.designer.cs"><DependentUpon>CustomFolderBrowserDialog.cs</DependentUpon></Compile>
-    <Compile Include="SolutionOrderDialog.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="SolutionOrderDialog.Designer.cs"><DependentUpon>SolutionOrderDialog.cs</DependentUpon></Compile>
-    <Compile Include="MissingComponentsControl.cs"><SubType>UserControl</SubType></Compile>
-    <Compile Include="MissingComponentsControl.Designer.cs"><DependentUpon>MissingComponentsControl.cs</DependentUpon></Compile>
-    <Compile Include="MissingComponentsForm.cs"><SubType>Form</SubType></Compile>
-    <Compile Include="MissingComponentsForm.Designer.cs"><DependentUpon>MissingComponentsForm.cs</DependentUpon></Compile>
-    <!-- Types: shared DTOs and engine components -->
+    <!-- Forms -->
+    <Compile Include="Forms\WebUIHost.cs"><SubType>UserControl</SubType></Compile>
+    <!-- Types -->
     <Compile Include="Types\FlowTypes.cs" />
-    <Compile Include="Types\EnvVarTypes.cs" />
-    <Compile Include="Types\SettingsTypes.cs" />
-    <Compile Include="Types\ListViewItemComparer.cs" />
     <Compile Include="Types\Requests.cs" />
-    <Compile Include="Types\ProgressItem.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Include="Types\ProgressItem.Designer.cs">
-      <DependentUpon>ProgressItem.cs</DependentUpon>
-    </Compile>
+    <!-- Services -->
+    <Compile Include="Services\TokenService.cs" />
+    <Compile Include="Services\FlowActivationService.cs" />
+    <Compile Include="Services\SolutionRemovalService.cs" />
+    <Compile Include="Services\SolutionTransferService.cs" />
+    <Compile Include="Services\MissingDependencyService.cs" />
     <!-- Core -->
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
@@ -135,12 +103,8 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
-    <Compile Include="SolutionManagement.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Include="SolutionManagement.Designer.cs">
-      <DependentUpon>SolutionManagement.cs</DependentUpon>
-    </Compile>
+    <Compile Include="SolutionManagement.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Include="SolutionManagement.Designer.cs"><DependentUpon>SolutionManagement.cs</DependentUpon></Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
@@ -149,16 +113,6 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Forms\SettingsForm.resx"><DependentUpon>SettingsForm.cs</DependentUpon></EmbeddedResource>
-    <EmbeddedResource Include="Forms\PreImportSummaryForm.resx"><DependentUpon>PreImportSummaryForm.cs</DependentUpon></EmbeddedResource>
-    <EmbeddedResource Include="Forms\UpdateVersionForm.resx"><DependentUpon>UpdateVersionForm.cs</DependentUpon></EmbeddedResource>
-    <EmbeddedResource Include="Forms\CustomFolderBrowserDialog.resx"><DependentUpon>CustomFolderBrowserDialog.cs</DependentUpon></EmbeddedResource>
-    <EmbeddedResource Include="SolutionOrderDialog.resx"><DependentUpon>SolutionOrderDialog.cs</DependentUpon></EmbeddedResource>
-    <EmbeddedResource Include="MissingComponentsControl.resx"><DependentUpon>MissingComponentsControl.cs</DependentUpon></EmbeddedResource>
-    <EmbeddedResource Include="MissingComponentsForm.resx"><DependentUpon>MissingComponentsForm.cs</DependentUpon></EmbeddedResource>
-    <EmbeddedResource Include="Types\ProgressItem.resx">
-      <DependentUpon>ProgressItem.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -170,51 +124,6 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\arrow_switch.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\progressbar.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\inbox_download.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\icons8-cancel.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Install.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Error32.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Startup32.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Solutions32.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\random.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Connect32.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\download.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\download1.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Arrow-Up-icon.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Arrow-Down-icon.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Waiting32.png" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ilmerge">
@@ -253,21 +162,6 @@
     <PackageReference Include="Microsoft.Web.WebView2">
       <Version>1.0.3351.48</Version>
     </PackageReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Error64.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\Success64.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\plus.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\plus1.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\delete.png" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\Icon.png" />

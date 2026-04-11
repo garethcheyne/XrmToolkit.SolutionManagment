@@ -1,238 +1,152 @@
-# Plan: Migrate Plugin UI to Vite + React + Fluent UI v9
+# Plan: Port Engine to React + Slim C# Services
 
 ## Context
 
-The XrmToolBox plugin currently uses WinForms controls (ListView, GroupBox, ToolStrip) for all tabs. We've proven that WebView2 works by shipping the Cloud Flows tab with a raw HTML/CSS/JS frontend — it renders beautifully inside XrmToolBox (confirmed by screenshot). 
+SolutionManagement.cs is 3000+ lines mixing SDK operations with WinForms dialogs. The goal: React handles ALL UI. C# becomes a set of tiny, focused service files — pure execution code with no forms. Each service hooks into React via the WebView2 bridge.
 
-Now we want to replace the raw HTML with a proper Vite + React + Fluent UI v9 app that covers **all tabs**, giving the plugin a modern Microsoft-native look (same design system as Power Platform, Azure Portal, M365).
-
-## Architecture
+## Target Architecture
 
 ```
 err403.SolutionManagment/
-├── WebUI/                              ← Vite + React project
-│   ├── src/
-│   │   ├── main.tsx                    ← App entry, FluentProvider
-│   │   ├── App.tsx                     ← Tab router (Solutions, EnvVars, Flows, Settings)
-│   │   ├── bridge.ts                   ← Type-safe C# ↔ JS message bridge
-│   │   ├── types.ts                    ← Shared TypeScript types matching C# DTOs
-│   │   ├── theme.ts                    ← Fluent UI theme customisation
-│   │   ├── tabs/
-│   │   │   ├── SolutionsTab.tsx        ← Solutions grid + target org columns
-│   │   │   ├── EnvironmentVarsTab.tsx  ← Env var grid + inline edit panel
-│   │   │   ├── CloudFlowsTab.tsx       ← Cloud flows grid (replace current HTML)
-│   │   │   └── PlatformSettingsTab.tsx ← Org settings comparison grid
-│   │   ├── panels/
-│   │   │   ├── ProgressPanel.tsx       ← Right-dock progress items
-│   │   │   ├── EnvVarEditPanel.tsx     ← Right-dock variable editor
-│   │   │   ├── FlowActionPanel.tsx     ← Right-dock flow activate/deactivate
-│   │   │   └── SettingsPanel.tsx       ← Right-dock plugin settings
-│   │   └── components/
-│   │       ├── StatusPill.tsx          ← Reusable On/Off/Suspended badge
-│   │       ├── TargetColumn.tsx        ← Reusable target org column renderer
-│   │       └── SearchToolbar.tsx       ← Reusable search + filter bar
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts                  ← Single-file output config
-│   └── index.html
-├── Resources/
-│   └── WebUI.html                      ← Vite build output (single file, embedded)
+├── Plugin.cs                          ← XrmToolBox entry point
+├── SolutionManagement.cs              ← SLIM: constructor + connection wiring (~200 lines)
+├── SolutionManagement.Designer.cs     ← SLIM: just WebView2 host control
+├── Services/                          ← One file per SDK operation (no UI)
+│   ├── SolutionTransferService.cs     ← Export + Import + Publish + Polling
+│   ├── FlowActivationService.cs       ← SetStateRequest for flows
+│   ├── SolutionRemovalService.cs      ← Delete solutions from targets
+│   ├── MissingDependencyService.cs    ← RetrieveMissingComponents
+│   └── TokenService.cs                ← Extract/refresh auth tokens
 ├── Forms/
-│   ├── WebUIHost.cs                    ← Single WebView2 DockContent (replaces all tab forms)
-│   ├── CloudFlowsForm.cs              ← KEPT (fallback / reference)
-│   ├── CloudFlowsWebForm.cs           ← REMOVED (replaced by unified WebUIHost)
-│   └── ...                             ← Other WinForms forms kept for modal dialogs
-└── SolutionTransferTool.cs             ← Rewired to use WebUIHost
+│   └── WebUIHost.cs                   ← WebView2 bridge (only C# form)
+├── Types/
+│   └── Requests.cs                    ← BaseToProcess, ExportToProcess, etc.
+├── AppCode/
+│   ├── Settings.cs                    ← Plugin settings
+│   ├── Enumerations.cs                ← Component types
+│   └── EnvironmentIdResolver.cs       ← Env ID resolution
+├── WebUI/                             ← Vite + React + Fluent UI
+│   └── src/
+│       ├── tabs/                      ← Data grids (fetch via Web API)
+│       ├── dialogs/                   ← React modals (replace WinForms dialogs)
+│       │   ├── SettingsDialog.tsx
+│       │   ├── PreImportSummary.tsx
+│       │   ├── UpdateVersionDialog.tsx
+│       │   ├── SolutionOrderDialog.tsx
+│       │   ├── FlowResultsDialog.tsx
+│       │   ├── ImportLogViewer.tsx
+│       │   ├── TransferEnvVarSummary.tsx
+│       │   └── MissingDepsDialog.tsx
+│       ├── components/
+│       └── panels/
+├── Resources/
+│   ├── WebUI.html                     ← Built React app
+│   └── Icon.png                       ← Plugin icon
+└── Archive/                           ← Old files (reference only)
 ```
 
-## Key Design Decisions
+## Principle
 
-### 1. Single WebView2 host, multiple React tabs
-Instead of one WebView2 per tab (wasteful), use ONE `WebUIHost.cs` DockContent with a single WebView2 control. React handles tab switching internally using Fluent UI's `<TabList>`. The C# side tells React which tab to show via `ExecuteScriptAsync`.
+**C# Services = pure execution, no UI.** Each service:
+- Takes parameters (solution IDs, connection details, settings)
+- Calls Dataverse SDK
+- Returns results via bridge to React
+- No MessageBox, no ShowDialog, no WinForms references
 
-This means we go from 4 DockContent tab forms + 3 right-panel forms → 1 WebView2 DockContent that fills the entire document area.
+**React = all UI decisions.** React handles:
+- Confirmation dialogs before operations
+- Settings input forms
+- Results display after operations
+- Progress visualization
+- Error display
 
-### 2. Right panels rendered inside the same WebView2
-The env var edit panel, flow action panel, and settings panel become React sidebars within the same WebView2 — no separate WinForms dock panels needed. This gives us seamless animations and consistent styling.
+## C# Services
 
-### 3. Progress panel stays as WinForms (Phase 1)
-The ProgressForm + ProgressItem controls manage real-time polling state with tight C# integration (timer ticks, async operation tracking, download links). Migrating this has high risk for low visual payoff. Keep it as a WinForms DockRight panel for now.
+### `Services/SolutionTransferService.cs`
+Execution: ExportSolutionRequest → ImportSolutionRequest → PublishAllXmlRequest
+Input from React: `{ solutions, targets, settings (managed, import mode, etc.) }`
+Output to React: progress updates `{ id, status, percentage, elapsed }`, completion `{ success, errors }`
+Async polling: Timer-based asyncoperation monitoring stays in C#
 
-### 4. Modal dialogs stay as WinForms
-PreImportSummaryForm, TransferEnvVarSummaryForm, FlowResultsForm, ImportLogViewerForm, UpdateVersionForm, AboutForm, MissingComponentsForm — these are all modal and work fine as WinForms. No migration needed.
+### `Services/FlowActivationService.cs`
+Execution: SetStateRequest per flow per target
+Input from React: `{ flows, targets, activate: bool }`
+Output to React: `[{ flowName, target, success, error }]`
 
-### 5. Source/Target org bar stays as WinForms
-The source label + target org buttons + Add button at the top of the plugin stay as WinForms controls in SolutionTransferTool.Designer.cs. They're simple and sit above the WebView2 area.
+### `Services/SolutionRemovalService.cs`
+Execution: Delete("solution", id) per solution per target
+Input from React: `{ solutions, targets }`
+Output to React: `[{ solution, target, success, error }]`
 
-## C# ↔ JS Bridge Protocol
+### `Services/MissingDependencyService.cs`
+Execution: RetrieveMissingComponentsRequest
+Input from React: `{ importJobId }`
+Output to React: `[{ requiredComponent, schemaName, solution, dependent }]`
 
-### C# → JS (via ExecuteScriptAsync)
+### `Services/TokenService.cs`
+Execution: Extract CurrentAccessToken from CrmServiceClient
+Input: ConnectionDetail
+Output to React: `{ orgUrl, token, environmentId }`
+
+## React Dialogs (replace WinForms modals)
+
+| Dialog | Purpose | Interaction |
+|--------|---------|-------------|
+| SettingsDialog | Configure import/export options | User fills form → sends settings with transfer request |
+| PreImportSummary | Confirm solutions to transfer | Shows list → user confirms → triggers C# service |
+| UpdateVersionDialog | Prompt for version number | Input field → sends version with transfer |
+| SolutionOrderDialog | Reorder solutions | Drag-drop → sends ordered list |
+| FlowResultsDialog | Show activation results | Receives results from C# → displays table |
+| ImportLogViewer | Show import errors | Receives error data from C# → 3-tab display |
+| TransferEnvVarSummary | Confirm env var transfer | Checkbox list → confirms → React does Web API calls |
+| MissingDepsDialog | Show missing components | Receives data from C# service → displays table |
+
+## Bridge Protocol
+
+### React → C# (SDK operations only)
 ```typescript
-// Tab navigation
-window.bridge.setActiveTab('solutions' | 'envvars' | 'flows' | 'settings')
-
-// Solutions tab
-window.bridge.loadSolutions(json: SolutionData[])
-window.bridge.addTargetSolutionColumn(connectionName: string)
-window.bridge.setTargetSolutions(connectionName: string, json: TargetSolution[])
-window.bridge.removeTargetColumn(connectionName: string)  // all tabs
-window.bridge.updateSolutionVersion(uniqueName: string, newVersion: string)
-
-// Environment Variables tab
-window.bridge.loadEnvVars(json: EnvVarData[])
-window.bridge.setTargetEnvVarValues(connectionName: string, json: TargetEnvVar[])
-
-// Cloud Flows tab (same as current)
-window.bridge.loadFlows(json: FlowData[])
-window.bridge.setTargetFlowStatus(connectionName: string, json: TargetFlow[])
-window.bridge.updateFlowCellStatus(connectionName, flowName, status, isMatch, isError)
-
-// Platform Settings tab
-window.bridge.loadSettings(json: SettingData[])
-window.bridge.setTargetSettingValues(connectionName: string, json: TargetSetting[])
-
-// Right panels
-window.bridge.loadEnvVarEditor(json: EnvVarEditData)
-window.bridge.loadFlowActions(json: FlowActionData)
-window.bridge.setFlowActionResult(connectionName, success, message)
-window.bridge.loadPluginSettings(json: PluginSettingsData)
+{ action: 'startTransfer', solutions, settings }
+{ action: 'activateFlows', flows, targets }
+{ action: 'deactivateFlows', flows, targets }
+{ action: 'removeSolutions', solutions, targets }
+{ action: 'findMissingDeps', importJobId }
+{ action: 'exportToFile', solutions }
+{ action: 'importFromFile' }
+{ action: 'refreshToken' }
+{ action: 'addTarget' }
+{ action: 'removeTarget', connectionName }
 ```
 
-### JS → C# (via postMessage)
+### C# → React (results + progress)
 ```typescript
-// All actions go through a single typed message:
-{ action: string, ...payload }
-
-// Solutions
-{ action: 'loadSolutions' }
-{ action: 'transferSolutions', solutions: [...] }
-{ action: 'exportSolutions', solutions: [...] }
-{ action: 'switchOrgs' }
-{ action: 'findMissingDeps' }
-{ action: 'openSolutionInMaker', solutionId: string }
-
-// Environment Variables
-{ action: 'refreshEnvVars' }
-{ action: 'editEnvVar', schemaName, displayName, typeName, sourceValue }
-{ action: 'transferEnvVars', items: [...] }
-{ action: 'saveEnvVar', changedValues: { connectionName: newValue } }
-
-// Cloud Flows
-{ action: 'refreshFlows' }
-{ action: 'activateFlows', flows: [...] }
-{ action: 'deactivateFlows', flows: [...] }
-{ action: 'openFlowInMaker', flowIds: [...], connectionName }
-
-// Platform Settings
-{ action: 'refreshSettings' }
-{ action: 'syncSettings', items: [...], selectedOnly: boolean }
-
-// Tab change
-{ action: 'tabChanged', tab: string }
+window.bridge.transferProgress({ id, status, percentage, elapsed })
+window.bridge.transferComplete({ success, errors, importJobId })
+window.bridge.flowResults([{ flowName, target, success, error }])
+window.bridge.missingDeps([{ component, schemaName, solution }])
+window.bridge.exportComplete({ filePath })
 ```
 
-## Fluent UI Components to Use
+## Files to Delete (move to Archive)
+- All Forms/ except WebUIHost.cs
+- MissingComponentsControl.* and MissingComponentsForm.*
+- SolutionOrderDialog.*
+- All Resources/ PNGs except Icon.png and WebUI.html
+- Types/ — FlowTypes.cs, EnvVarTypes.cs, SettingsTypes.cs, ListViewItemComparer.cs, ProgressItem.*
+- AppCode/ — DownloadLogEventArgs.cs, TargetOrganizationsEventArgs.cs, VersionTypeConverter.cs, ConnectionReferenceInfo.cs, SolutionHelper.cs
 
-| Current WinForms | Fluent UI v9 Replacement |
-|-----------------|------------------------|
-| ListView | `<DataGrid>` (from @fluentui/react-table) or `<Table>` |
-| TextBox (search) | `<SearchBox>` |
-| ComboBox (filter) | `<Dropdown>` |
-| CheckBox (toggle) | `<Switch>` |
-| TabControl | `<TabList>` + `<Tab>` |
-| PropertyGrid | Custom form with `<Field>` + `<Input>` / `<Switch>` / `<Dropdown>` |
-| ToolStrip buttons | `<Toolbar>` + `<ToolbarButton>` |
-| StatusPill (custom) | `<Badge>` |
-| GroupBox | `<Card>` |
-| ContextMenu | `<Menu>` + `<MenuTrigger>` |
+## Implementation Order
 
-## NPM Dependencies
-
-```json
-{
-  "dependencies": {
-    "@fluentui/react-components": "^9.x",
-    "@fluentui/react-icons": "^2.x",
-    "@fluentui/react-table": "^9.x",
-    "react": "^18.x",
-    "react-dom": "^18.x"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.x",
-    "vite": "^6.x",
-    "vite-plugin-singlefile": "^2.x",
-    "typescript": "^5.x",
-    "@types/react": "^18.x",
-    "@types/react-dom": "^18.x"
-  }
-}
-```
-
-## C# Changes
-
-### New: `WebUIHost.cs`
-Single DockContent form containing WebView2. Replaces MainForm, EnvironmentVariablesForm, CloudFlowsWebForm, OrgSettingsForm as tab hosts. Exposes typed methods matching the bridge protocol above.
-
-### Modified: `SolutionTransferTool.cs`
-- Replace `mForm`, `evForm`, `cfForm`, `osForm`, `evEditPanel`, `flowActionPanel`, `sForm` with single `webUI` field
-- Keep `pForm` (ProgressForm) as separate WinForms DockRight
-- Route all existing events through `webUI.OnMessage` handler
-- Toolbar button visibility managed by listening to `tabChanged` messages
-
-### Removed:
-- `CloudFlowsWebForm.cs` (replaced by unified host)
-- `Resources/CloudFlows.html` (replaced by Vite output)
-
-### Kept as-is:
-- All modal dialog forms
-- ProgressForm + ProgressItem
-- Source/Target org bar in SolutionTransferTool.Designer.cs
-
-## Implementation Phases
-
-### Phase 1: Scaffold + Cloud Flows (validate the stack)
-1. Create `WebUI/` Vite project with React + Fluent UI v9
-2. Build CloudFlowsTab.tsx (port from current working HTML)
-3. Create bridge.ts with typed message passing
-4. Create WebUIHost.cs
-5. Wire up in SolutionTransferTool.cs (Cloud Flows only)
-6. Verify it works identically to current WebView2 implementation
-
-### Phase 2: Solutions Tab
-7. Build SolutionsTab.tsx with DataGrid, target columns, version coloring
-8. Port MainForm logic to WebUIHost bridge
-9. Keep source/target org bar as WinForms above the WebView2
-
-### Phase 3: Environment Variables Tab
-10. Build EnvironmentVarsTab.tsx with DataGrid + inline edit sidebar
-11. Port EnvVarEditPanel as React sidebar component
-12. Wire up edit/transfer/refresh actions
-
-### Phase 4: Platform Settings Tab
-13. Build PlatformSettingsTab.tsx
-14. Port OrgSettingsForm logic
-
-### Phase 5: Right Panels + Polish
-15. Port FlowActionPanel, SettingsPanel to React sidebars
-16. Add dark mode toggle (Fluent UI supports it natively)
-17. Clean up old WinForms form files
-
-## Build Integration
-
-- `npm run build` in WebUI/ outputs `WebUI.html` to `Resources/`
-- `WebUI.html` is an EmbeddedResource in the .csproj
-- Pre-build event in .csproj runs `npm run build` (or manual)
-- No node_modules shipped — only the built HTML file goes into the DLL
+### Step 1: Services/ + TokenService
+### Step 2: FlowActivationService + React FlowResultsDialog
+### Step 3: SolutionRemovalService
+### Step 4: SolutionTransferService + React dialogs (SettingsDialog, PreImportSummary, etc.)
+### Step 5: MissingDependencyService + React MissingDepsDialog
+### Step 6: Slim SolutionManagement.cs to ~200 lines
+### Step 7: Delete old files, clean Resources/
 
 ## Verification
-
-1. Build the Vite project: `cd WebUI && npm run build`
-2. Build the C# project in Visual Studio
-3. Launch XrmToolBox, open the plugin
-4. Connect to a source environment
-5. Verify each tab renders correctly with data
-6. Add a target environment, verify target columns appear
-7. Test activate/deactivate flows
-8. Test env var edit and transfer
-9. Test solution transfer
-10. Verify modal dialogs still work (pre-import summary, results, etc.)
+1. `cd WebUI && npm run build` + Build in VS
+2. Transfer solution → React dialogs for config/confirm → C# executes → React shows progress
+3. Activate flows → C# SetState → React shows results
+4. Export → C# saves ZIP → React shows completion
+5. All old WinForms dialogs gone
