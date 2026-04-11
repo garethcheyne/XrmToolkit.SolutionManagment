@@ -4,12 +4,13 @@ import {
   DataGridBody, DataGridCell, createTableColumn,
   type TableColumnDefinition, type DataGridProps,
   SearchBox, Dropdown, Option, Switch, Text, Toolbar, ToolbarButton, ToolbarDivider,
-  Badge, Spinner, Menu, MenuTrigger, MenuPopover, MenuList, MenuItem,
+  Badge, Menu, MenuTrigger, MenuPopover, MenuList, MenuItem,
   tokens, makeStyles, type SelectionItemId,
 } from '@fluentui/react-components';
 import {
   ArrowSyncRegular, PlayRegular, StopRegular, OpenRegular,
 } from '@fluentui/react-icons';
+import { TableSkeleton } from '../components/TableSkeleton';
 import { useQuery } from '@tanstack/react-query';
 import { getCloudFlows } from '../dataverse';
 import { getAuth } from '../auth';
@@ -30,6 +31,7 @@ const useStyles = makeStyles({
   },
   searchBox: { flexGrow: 1, maxWidth: '320px' },
   gridContainer: { flex: 1, overflow: 'auto' },
+  headerCell: { fontWeight: 700, fontSize: '12px', backgroundColor: tokens.colorNeutralBackground3 },
   countBadge: { marginLeft: 'auto' },
   emptyState: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -37,7 +39,7 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   loadingState: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '12px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px',
   },
 });
 
@@ -71,17 +73,16 @@ interface FlowRow {
 
 interface CloudFlowsTabProps {
   targets: TargetConnection[];
+  targetFlowData: Record<string, Array<{ name: string; statecode: number; statuscode: number }>>;
 }
 
-export function CloudFlowsTab({ targets }: CloudFlowsTabProps) {
+export function CloudFlowsTab({ targets, targetFlowData }: CloudFlowsTabProps) {
   const styles = useStyles();
   const auth = getAuth();
   const [search, setSearch] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<SelectionItemId>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ flowId: string; x: number; y: number } | null>(null);
-
-  void targets; // Will be used for target status comparison
 
   const { data: workflows = [], isLoading, refetch } = useQuery({
     queryKey: ['cloudFlows', auth?.orgUrl],
@@ -135,8 +136,30 @@ export function CloudFlowsTab({ targets }: CloudFlowsTabProps) {
         renderHeaderCell: () => 'Modified', renderCell: (item) => item.modifiedOn,
       }),
     ];
+
+    // Target status columns
+    for (const t of targets) {
+      const tFlows = targetFlowData[t.name];
+      cols.push(createTableColumn({
+        columnId: `target_${t.name}`,
+        compare: (a, b) => {
+          const sa = tFlows?.find(f => f.name === a.name)?.statecode ?? -1;
+          const sb = tFlows?.find(f => f.name === b.name)?.statecode ?? -1;
+          return sa - sb;
+        },
+        renderHeaderCell: () => t.name,
+        renderCell: (item) => {
+          if (!tFlows) return <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>—</Text>;
+          const match = tFlows.find(f => f.name === item.name);
+          if (!match) return <Text size={200} style={{ color: tokens.colorNeutralForeground4 }}>not found</Text>;
+          const targetStatus = match.statecode === 1 ? 'On' : match.statecode === 2 ? 'Suspended' : 'Off';
+          return <StatusPill status={targetStatus} stateCode={match.statecode} />;
+        },
+      }));
+    }
+
     return cols;
-  }, []);
+  }, [targets, targetFlowData]);
 
   const onSelectionChange: DataGridProps['onSelectionChange'] = useCallback(
     (_e: unknown, data: { selectedItems: Set<SelectionItemId> }) => setSelectedItems(data.selectedItems), []);
@@ -147,7 +170,7 @@ export function CloudFlowsTab({ targets }: CloudFlowsTabProps) {
     [filteredRows, selectedItems]);
 
   if (isLoading) {
-    return <div className={styles.loadingState}><Spinner size="small" /><Text>Loading cloud flows...</Text></div>;
+    return <TableSkeleton />;
   }
 
   return (
@@ -180,11 +203,11 @@ export function CloudFlowsTab({ targets }: CloudFlowsTabProps) {
         </div>
       ) : (
         <div className={styles.gridContainer}>
-          <DataGrid items={filteredRows} columns={columns} sortable selectionMode="multiselect"
+          <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
             selectedItems={selectedItems} onSelectionChange={onSelectionChange}
             getRowId={(item) => item.workflowId} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
-            <DataGridHeader>
-              <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
+            <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
+              <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
             </DataGridHeader>
             <DataGridBody<FlowRow>>
               {({ item, rowId }) => (
@@ -205,7 +228,7 @@ export function CloudFlowsTab({ targets }: CloudFlowsTabProps) {
             <MenuPopover><MenuList>
               <MenuItem icon={<OpenRegular />} onClick={() => {
                 const envId = auth?.environmentId;
-                if (envId) window.open(`https://make.powerapps.com/environments/${envId}/solutions/fd140aaf-4df4-11dd-bd17-0019b9312238/objects/cloudflows/${contextMenu.flowId}/view`, '_blank');
+                if (envId) postMessage({ action: 'openUrl', url: `https://make.powerapps.com/environments/${envId}/solutions/fd140aaf-4df4-11dd-bd17-0019b9312238/objects/cloudflows/${contextMenu.flowId}/view` });
                 setContextMenu(null);
               }}>Open in Power Automate</MenuItem>
             </MenuList></MenuPopover>

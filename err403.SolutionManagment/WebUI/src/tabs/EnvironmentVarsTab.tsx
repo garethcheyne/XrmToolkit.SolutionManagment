@@ -4,9 +4,10 @@ import {
   DataGridBody, DataGridCell, createTableColumn,
   type TableColumnDefinition, type DataGridProps,
   SearchBox, Text, Toolbar, ToolbarButton, ToolbarDivider,
-  Badge, Switch, Spinner, tokens, makeStyles, type SelectionItemId,
+  Badge, Switch, tokens, makeStyles, type SelectionItemId,
 } from '@fluentui/react-components';
 import { ArrowSyncRegular, ArrowUploadRegular } from '@fluentui/react-icons';
+import { TableSkeleton } from '../components/TableSkeleton';
 import { useQuery } from '@tanstack/react-query';
 import { getEnvVarDefinitions, getEnvVarValues } from '../dataverse';
 import { getAuth } from '../auth';
@@ -25,6 +26,7 @@ const useStyles = makeStyles({
   },
   searchBox: { flexGrow: 1, maxWidth: '320px' },
   gridContainer: { flex: 1, overflow: 'auto' },
+  headerCell: { fontWeight: 700, fontSize: '12px', backgroundColor: tokens.colorNeutralBackground3 },
   matchCell: { color: tokens.colorPaletteGreenForeground1 },
   mismatchCell: { color: tokens.colorPaletteRedForeground1 },
   notFoundCell: { color: tokens.colorNeutralForeground4, fontStyle: 'italic' },
@@ -35,7 +37,7 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   loadingState: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '12px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px',
   },
 });
 
@@ -63,9 +65,10 @@ interface EnvVarRow {
 
 interface EnvironmentVarsTabProps {
   targets: TargetConnection[];
+  targetEnvVarData: Record<string, Array<{ schemaname: string; value: string; exists: boolean }>>;
 }
 
-export function EnvironmentVarsTab({ targets }: EnvironmentVarsTabProps) {
+export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVarsTabProps) {
   const styles = useStyles();
   const auth = getAuth();
   const [search, setSearch] = useState('');
@@ -143,11 +146,29 @@ export function EnvironmentVarsTab({ targets }: EnvironmentVarsTabProps) {
       }),
     );
 
-    // Target columns would be added here when target env var fetching is implemented
-    void targets; // acknowledge prop usage
+    for (const t of targets) {
+      const tVars = targetEnvVarData[t.name];
+      cols.push(createTableColumn({
+        columnId: `target_${t.name}`,
+        compare: (a, b) => {
+          const va = tVars?.find(v => v.schemaname === a.schemaName)?.value ?? '';
+          const vb = tVars?.find(v => v.schemaname === b.schemaName)?.value ?? '';
+          return va.localeCompare(vb);
+        },
+        renderHeaderCell: () => t.name,
+        renderCell: (item) => {
+          if (!tVars) return <Text className={styles.notFoundCell} size={200}>—</Text>;
+          const match = tVars.find(v => v.schemaname === item.schemaName);
+          if (!match || !match.exists) return <Text className={styles.notFoundCell} size={200}>not found</Text>;
+          const isMatch = match.value === item.currentValue;
+          return <Text className={isMatch ? styles.matchCell : styles.mismatchCell} truncate wrap={false} size={200}
+            title={match.value}>{match.value || '(default)'}</Text>;
+        },
+      }));
+    }
 
     return cols;
-  }, [showSchema, targets]);
+  }, [showSchema, targets, targetEnvVarData, styles]);
 
   const onSelectionChange: DataGridProps['onSelectionChange'] = useCallback(
     (_e: unknown, data: { selectedItems: Set<SelectionItemId> }) => setSelectedItems(data.selectedItems), []);
@@ -155,7 +176,7 @@ export function EnvironmentVarsTab({ targets }: EnvironmentVarsTabProps) {
   const isLoading = loadingDefs || loadingVals;
 
   if (isLoading) {
-    return <div className={styles.loadingState}><Spinner size="small" /><Text>Loading environment variables...</Text></div>;
+    return <TableSkeleton />;
   }
 
   return (
@@ -183,11 +204,11 @@ export function EnvironmentVarsTab({ targets }: EnvironmentVarsTabProps) {
         </div>
       ) : (
         <div className={styles.gridContainer}>
-          <DataGrid items={filteredRows} columns={columns} sortable selectionMode="multiselect"
+          <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
             selectedItems={selectedItems} onSelectionChange={onSelectionChange}
             getRowId={(item) => item.definitionId} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
-            <DataGridHeader>
-              <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
+            <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
+              <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
             </DataGridHeader>
             <DataGridBody<EnvVarRow>>
               {({ item, rowId }) => (

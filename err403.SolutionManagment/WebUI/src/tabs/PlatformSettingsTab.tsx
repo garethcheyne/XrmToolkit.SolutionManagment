@@ -4,9 +4,10 @@ import {
   DataGridBody, DataGridCell, createTableColumn,
   type TableColumnDefinition, type DataGridProps,
   SearchBox, Dropdown, Option, Text, Toolbar, ToolbarButton,
-  Badge, Spinner, tokens, makeStyles, type SelectionItemId,
+  Badge, tokens, makeStyles, type SelectionItemId,
 } from '@fluentui/react-components';
 import { ArrowSyncRegular } from '@fluentui/react-icons';
+import { TableSkeleton } from '../components/TableSkeleton';
 import { useQuery } from '@tanstack/react-query';
 import { getOrgSettings } from '../dataverse';
 import { getAuth } from '../auth';
@@ -25,6 +26,7 @@ const useStyles = makeStyles({
   },
   searchBox: { flexGrow: 1, maxWidth: '320px' },
   gridContainer: { flex: 1, overflow: 'auto' },
+  headerCell: { fontWeight: 700, fontSize: '12px', backgroundColor: tokens.colorNeutralBackground3 },
   boolTrue: { color: tokens.colorPaletteGreenForeground1, fontWeight: 600 },
   boolFalse: { color: tokens.colorPaletteRedForeground1, fontWeight: 600 },
   countBadge: { marginLeft: 'auto' },
@@ -34,7 +36,7 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   loadingState: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '12px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '12px',
   },
 });
 
@@ -82,7 +84,7 @@ export function PlatformSettingsTab({ targets }: PlatformSettingsTabProps) {
   const rows: SettingRow[] = useMemo(() => {
     if (!orgData) return [];
     return Object.entries(orgData)
-      .filter(([key, value]) => !SKIP_KEYS.has(key) && value !== null && value !== undefined && typeof value !== 'object')
+      .filter(([key, value]) => !SKIP_KEYS.has(key) && !key.includes('@') && !key.startsWith('_') && value !== null && value !== undefined && typeof value !== 'object')
       .map(([key, value]) => ({
         uniqueName: key,
         displayName: key,
@@ -133,7 +135,7 @@ export function PlatformSettingsTab({ targets }: PlatformSettingsTabProps) {
     (_e: unknown, data: { selectedItems: Set<SelectionItemId> }) => setSelectedItems(data.selectedItems), []);
 
   if (isLoading) {
-    return <div className={styles.loadingState}><Spinner size="small" /><Text>Loading organization settings...</Text></div>;
+    return <TableSkeleton />;
   }
 
   return (
@@ -166,11 +168,11 @@ export function PlatformSettingsTab({ targets }: PlatformSettingsTabProps) {
         </div>
       ) : (
         <div className={styles.gridContainer}>
-          <DataGrid items={filteredRows} columns={columns} sortable selectionMode="multiselect"
+          <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
             selectedItems={selectedItems} onSelectionChange={onSelectionChange}
             getRowId={(item) => item.uniqueName} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
-            <DataGridHeader>
-              <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
+            <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
+              <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
             </DataGridHeader>
             <DataGridBody<SettingRow>>
               {({ item, rowId }) => (

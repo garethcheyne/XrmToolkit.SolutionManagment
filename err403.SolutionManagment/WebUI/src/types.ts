@@ -12,15 +12,39 @@ export interface TargetConnection {
   environmentId: string | null;
 }
 
+// ── Transfer settings ──
+
+export interface TransferSettings {
+  managed: boolean;
+  importMode: 'Update' | 'StageForUpgrade' | 'Upgrade';
+  overwriteUnmanaged: boolean;
+  publishWorkflows: boolean;
+  checkDependencies: boolean;
+  convertToManaged: boolean;
+}
+
+export interface TransferResult {
+  solution: string;
+  target: string;
+  success: boolean;
+  error: string;
+}
+
+export interface FlowResult {
+  flowName: string;
+  targetName: string;
+  success: boolean;
+  errorMessage: string;
+  isConnectionRefError: boolean;
+}
+
 // ── Bridge message types ──
-// Only write operations go through C# (SDK-only operations).
-// All reads are done directly by React via Dataverse Web API.
 
 export type BridgeMessage =
   // Solutions (SDK write operations)
-  | { action: 'transferSolutions'; solutions: SelectedSolution[] }
-  | { action: 'transferWithSettings'; solutions: SelectedSolution[] }
+  | { action: 'startTransfer'; solutions: SelectedSolution[]; settings: TransferSettings }
   | { action: 'importFromFile' }
+  | { action: 'exportToFile'; solutions: SelectedSolution[] }
   | { action: 'removeFromTargets'; solutions: SelectedSolution[] }
   | { action: 'switchOrgs' }
   | { action: 'findMissingDeps' }
@@ -32,11 +56,9 @@ export type BridgeMessage =
   | { action: 'addTarget' }
   | { action: 'removeTarget'; connectionName: string }
   | { action: 'refreshToken' }
-  // Progress
-  | { action: 'downloadLog'; id: string }
-  | { action: 'viewMessage'; id: string }
-  | { action: 'downloadSolutionFile'; id: string }
-  | { action: 'retryTransfer' };
+  | { action: 'openUrl'; url: string }
+  // Settings persistence
+  | { action: 'savePluginSettings'; settings: string };
 
 export interface SelectedSolution {
   solutionId: string;

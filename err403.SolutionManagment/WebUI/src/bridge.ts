@@ -38,6 +38,19 @@ type BridgeHandlers = {
   // Source display name (for ConnectionBar)
   setSource: (connectionName: string, isConnected: boolean) => void;
 
+  // Target data from C# (targets have separate auth, React can't query directly)
+  targetSolutions: (connectionName: string, json: string) => void;
+  targetFlows: (connectionName: string, json: string) => void;
+  targetEnvVars: (connectionName: string, json: string) => void;
+
+  // Plugin settings persistence
+  loadPluginSettings: (json: string) => void;
+
+  // Results from C# services
+  transferResult: (json: string) => void;
+  flowResults: (json: string) => void;
+  missingDeps: (json: string) => void;
+
   // Tab navigation
   setActiveTab: (tab: string) => void;
 
@@ -101,6 +114,19 @@ const bridgeApi = {
     callOrBuffer('addTargetContext', [name, orgUrl, token, envId]),
   removeTarget: (name: string) => callOrBuffer('removeTarget', [name]),
   setTargets: (json: string) => callOrBuffer('setTargets', [json]),
+
+  // Target data from C#
+  targetSolutions: (cn: string, json: string) => callOrBuffer('targetSolutions', [cn, json]),
+  targetFlows: (cn: string, json: string) => callOrBuffer('targetFlows', [cn, json]),
+  targetEnvVars: (cn: string, json: string) => callOrBuffer('targetEnvVars', [cn, json]),
+
+  // Plugin settings
+  loadPluginSettings: (json: string) => callOrBuffer('loadPluginSettings', [json]),
+
+  // Results from C# services
+  transferResult: (json: string) => callOrBuffer('transferResult', [json]),
+  flowResults: (json: string) => callOrBuffer('flowResults', [json]),
+  missingDeps: (json: string) => callOrBuffer('missingDeps', [json]),
 
   // Progress (C# manages these for write operations)
   setProgressItems: (json: string) => callOrBuffer('setProgressItems', [json]),

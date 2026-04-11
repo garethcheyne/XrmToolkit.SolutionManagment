@@ -62,7 +62,7 @@ export interface SolutionRecord {
 export async function getSolutions() {
   const data = await apiFetch<ODataResponse<SolutionRecord>>(
     `solutions?$select=solutionid,uniquename,friendlyname,version,installedon,description,ismanaged,_publisherid_value` +
-      `&$filter=isvisible eq true and uniquename ne 'Default' and uniquename ne 'Active' and uniquename ne 'Basic'` +
+      `&$filter=ismanaged eq false and isvisible eq true and uniquename ne 'Default' and uniquename ne 'Active' and uniquename ne 'Basic'` +
       `&$orderby=friendlyname asc` +
       `&$expand=publisherid($select=friendlyname)`
   );
@@ -70,8 +70,13 @@ export async function getSolutions() {
 }
 
 export async function getTargetSolutions(orgUrl: string, token: string, uniqueNames: string[]) {
-  const filter = uniqueNames.map((n) => `uniquename eq '${n}'`).join(' or ');
-  const url = `${orgUrl}/api/data/${API_VERSION}/solutions?$select=uniquename,version,ismanaged&$filter=${filter}`;
+  if (uniqueNames.length === 0) return [];
+
+  // Use fetchXml for large lists to avoid URL length limits
+  const values = uniqueNames.map((n) => `<value>${n}</value>`).join('');
+  const fetchXml = `<fetch><entity name="solution"><attribute name="uniquename"/><attribute name="version"/><attribute name="ismanaged"/><filter><condition attribute="uniquename" operator="in">${values}</condition></filter></entity></fetch>`;
+
+  const url = `${orgUrl}/api/data/${API_VERSION}/solutions?fetchXml=${encodeURIComponent(fetchXml)}`;
 
   const res = await fetch(url, {
     headers: {

@@ -28,6 +28,7 @@ namespace err403.SolutionManagment.Forms
         private List<FlowDataDto> currentFlows = new List<FlowDataDto>();
 
         // Solutions events
+        public event EventHandler<StartTransferEventArgs> StartTransferRequested;
         public event EventHandler LoadSolutionsRequested;
         public event EventHandler<SolutionActionEventArgs> TransferSolutionsRequested;
         public event EventHandler<SolutionActionEventArgs> TransferWithSettingsRequested;
@@ -64,6 +65,9 @@ namespace err403.SolutionManagment.Forms
         public event EventHandler<ProgressActionEventArgs> ProgressActionRequested;
         public event EventHandler RetryRequested;
 
+        // Settings persistence events
+        public event EventHandler<StringEventArgs> SavePluginSettingsRequested;
+
         // Auth events
         public event EventHandler RefreshTokenRequested;
 
@@ -98,6 +102,7 @@ namespace err403.SolutionManagment.Forms
                     false;
 #endif
                 webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                webView.ZoomFactor = 0.8;
 
                 webView.CoreWebView2.WebMessageReceived += CoreWebView2_WebMessageReceived;
 
@@ -214,6 +219,21 @@ namespace err403.SolutionManagment.Forms
                         RefreshTokenRequested?.Invoke(this, EventArgs.Empty);
                         break;
 
+                    case "savePluginSettings":
+                        if (msg.ContainsKey("settings"))
+                            SavePluginSettingsRequested?.Invoke(this, new StringEventArgs { Value = msg["settings"].ToString() });
+                        break;
+
+                    case "openUrl":
+                        if (msg.ContainsKey("url"))
+                        {
+                            var url = msg["url"].ToString();
+                            System.Diagnostics.Trace.WriteLine($"[WebUIHost] openUrl: {url}");
+                            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true }); }
+                            catch (System.Exception ex) { System.Diagnostics.Trace.WriteLine($"[WebUIHost] openUrl error: {ex.Message}"); }
+                        }
+                        break;
+
                     // Solutions
                     case "loadSolutions":
                         LoadSolutionsRequested?.Invoke(this, EventArgs.Empty);
@@ -221,6 +241,23 @@ namespace err403.SolutionManagment.Forms
 
                     case "transferSolutions":
                         RaiseSolutionEvent(TransferSolutionsRequested, msg);
+                        break;
+
+                    case "startTransfer":
+                        if (msg.ContainsKey("solutions") && msg.ContainsKey("settings"))
+                        {
+                            var solutions = JsonConvert.DeserializeObject<List<SolutionActionItem>>(msg["solutions"].ToString());
+                            var transferSettings = JsonConvert.DeserializeObject<Services.SolutionTransferService.TransferSettings>(msg["settings"].ToString());
+                            StartTransferRequested?.Invoke(this, new StartTransferEventArgs
+                            {
+                                Solutions = solutions,
+                                Settings = transferSettings
+                            });
+                        }
+                        break;
+
+                    case "exportToFile":
+                        RaiseSolutionEvent(ExportSolutionsRequested, msg);
                         break;
 
                     case "transferWithSettings":
@@ -641,6 +678,26 @@ namespace err403.SolutionManagment.Forms
 
         // ── Public API: Results from C# services ──
 
+        public void SendPluginSettings(string json)
+        {
+            ExecuteScript($"window.bridge.loadPluginSettings({JsonConvert.SerializeObject(json)})");
+        }
+
+        public void SendTargetSolutions(string connectionName, string json)
+        {
+            ExecuteScript($"window.bridge.targetSolutions?.({JsonConvert.SerializeObject(connectionName)}, {JsonConvert.SerializeObject(json)})");
+        }
+
+        public void SendTargetFlows(string connectionName, string json)
+        {
+            ExecuteScript($"window.bridge.targetFlows?.({JsonConvert.SerializeObject(connectionName)}, {JsonConvert.SerializeObject(json)})");
+        }
+
+        public void SendTargetEnvVars(string connectionName, string json)
+        {
+            ExecuteScript($"window.bridge.targetEnvVars?.({JsonConvert.SerializeObject(connectionName)}, {JsonConvert.SerializeObject(json)})");
+        }
+
         public void SendFlowResults(string json)
         {
             ExecuteScript($"window.bridge.flowResults?.({JsonConvert.SerializeObject(json)})");
@@ -815,5 +872,11 @@ namespace err403.SolutionManagment.Forms
         [JsonProperty("uniqueName")] public string UniqueName { get; set; }
         [JsonProperty("displayName")] public string DisplayName { get; set; }
         [JsonProperty("sourceValue")] public string SourceValue { get; set; }
+    }
+
+    public class StartTransferEventArgs : EventArgs
+    {
+        public List<SolutionActionItem> Solutions { get; set; } = new List<SolutionActionItem>();
+        public Services.SolutionTransferService.TransferSettings Settings { get; set; }
     }
 }

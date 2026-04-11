@@ -96,6 +96,7 @@
     <Compile Include="Services\SolutionRemovalService.cs" />
     <Compile Include="Services\SolutionTransferService.cs" />
     <Compile Include="Services\MissingDependencyService.cs" />
+    <Compile Include="Services\TargetQueryService.cs" />
     <!-- Core -->
     <Compile Include="Plugin.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
@@ -177,6 +178,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
+    <PreBuildEvent>cd "$(ProjectDir)WebUI" &amp;&amp; npm run build</PreBuildEvent>
     <PostBuildEvent>IF NOT EXIST "C:\APPS\XRMTOOLBOX\Storage\Plugins" mkdir "C:\APPS\XRMTOOLBOX\Storage\Plugins"
 COPY /Y "$(TargetPath)" "C:\APPS\XRMTOOLBOX\Storage\Plugins\$(TargetFileName)"
 IF NOT EXIST "%APPDATA%\MscrmTools\XrmToolBox\Plugins" mkdir "%APPDATA%\MscrmTools\XrmToolBox\Plugins"

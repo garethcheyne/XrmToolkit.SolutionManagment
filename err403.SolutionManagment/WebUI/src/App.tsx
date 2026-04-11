@@ -21,6 +21,7 @@ import { CloudFlowsTab } from './tabs/CloudFlowsTab';
 import { PlatformSettingsTab } from './tabs/PlatformSettingsTab';
 import { ConnectionBar } from './components/ConnectionBar';
 import { ProgressPanel, type ProgressItemData } from './panels/ProgressPanel';
+import { defaultSettings, type PluginSettings } from './dialogs/SettingsDrawer';
 import { setBridgeHandler, postMessage } from './bridge';
 import type { SourceConnection, TargetConnection } from './types';
 
@@ -72,6 +73,10 @@ export function App() {
   const [progressItems, setProgressItems] = useState<ProgressItemData[]>([]);
   const [progressVisible, setProgressVisible] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
+  const [targetSolutionData, setTargetSolutionData] = useState<Record<string, Array<{ uniquename: string; version: string; ismanaged: boolean }>>>({});
+  const [targetFlowData, setTargetFlowData] = useState<Record<string, Array<{ name: string; statecode: number; statuscode: number }>>>({});
+  const [targetEnvVarData, setTargetEnvVarData] = useState<Record<string, Array<{ schemaname: string; value: string; exists: boolean }>>>({});
+  const [pluginSettings, setPluginSettings] = useState<PluginSettings>(defaultSettings);
 
   const updateItem = useCallback((updated: ProgressItemData) => {
     setProgressItems((prev) =>
@@ -114,6 +119,30 @@ export function App() {
       setTargets(parsed);
     });
 
+    // Load saved plugin settings from C#
+    setBridgeHandler('loadPluginSettings', (json: string) => {
+      try {
+        const saved: Partial<PluginSettings> = JSON.parse(json);
+        setPluginSettings((prev) => ({ ...prev, ...saved }));
+      } catch { /* ignore parse errors */ }
+    });
+
+    // Target data from C# (persists across tab switches)
+    setBridgeHandler('targetSolutions', (connectionName: string, json: string) => {
+      const solutions: Array<{ uniquename: string; version: string; ismanaged: boolean }> = JSON.parse(json);
+      setTargetSolutionData((prev) => ({ ...prev, [connectionName]: solutions }));
+    });
+
+    setBridgeHandler('targetFlows', (connectionName: string, json: string) => {
+      const flows: Array<{ name: string; statecode: number; statuscode: number }> = JSON.parse(json);
+      setTargetFlowData((prev) => ({ ...prev, [connectionName]: flows }));
+    });
+
+    setBridgeHandler('targetEnvVars', (connectionName: string, json: string) => {
+      const vars: Array<{ schemaname: string; value: string; exists: boolean }> = JSON.parse(json);
+      setTargetEnvVarData((prev) => ({ ...prev, [connectionName]: vars }));
+    });
+
     setBridgeHandler('setProgressItems', (json: string) => {
       const items: ProgressItemData[] = JSON.parse(json);
       setProgressItems(items);
@@ -134,6 +163,12 @@ export function App() {
       setShowRetry(show);
     });
   }, [updateItem]);
+
+  const handleSettingsChange = useCallback((newSettings: PluginSettings) => {
+    setPluginSettings(newSettings);
+    // Persist to C#
+    postMessage({ action: 'savePluginSettings', settings: JSON.stringify(newSettings) });
+  }, []);
 
   const handleTabSelect = (_event: unknown, data: SelectTabData) => {
     const tab = data.value as TabId;
@@ -168,9 +203,10 @@ export function App() {
           </div>
           <div className={styles.body}>
             <div className={styles.content}>
-              {activeTab === 'solutions' && <SolutionsTab targets={targets} />}
-              {activeTab === 'envvars' && <EnvironmentVarsTab targets={targets} />}
-              {activeTab === 'flows' && <CloudFlowsTab targets={targets} />}
+              {activeTab === 'solutions' && <SolutionsTab targets={targets} targetSolutionData={targetSolutionData}
+                pluginSettings={pluginSettings} onSettingsChange={handleSettingsChange} />}
+              {activeTab === 'envvars' && <EnvironmentVarsTab targets={targets} targetEnvVarData={targetEnvVarData} />}
+              {activeTab === 'flows' && <CloudFlowsTab targets={targets} targetFlowData={targetFlowData} />}
               {activeTab === 'settings' && <PlatformSettingsTab targets={targets} />}
             </div>
             <ProgressPanel
