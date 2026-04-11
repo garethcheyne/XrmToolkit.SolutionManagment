@@ -280,7 +280,8 @@ export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSe
         <ToolbarButton icon={<FolderOpenRegular />} onClick={() => postMessage({ action: 'importFromFile' })}>Import from File</ToolbarButton>
         <ToolbarDivider />
         <ToolbarButton icon={<ArrowDownloadRegular />} onClick={() => { const s = getSelected(); if (s.length) postMessage({ action: 'exportToFile', solutions: s }); }}>Export</ToolbarButton>
-        <ToolbarButton icon={<DeleteRegular />} onClick={() => { const s = getSelected(); if (s.length) postMessage({ action: 'removeFromTargets', solutions: s }); }}>Remove</ToolbarButton>
+        <ToolbarButton icon={<DeleteRegular />} onClick={() => { const s = getSelected(); if (s.length) postMessage({ action: 'removeFromTargets', solutions: s }); }}>Remove from Targets</ToolbarButton>
+        <ToolbarButton icon={<DeleteRegular />} onClick={() => { const s = getSelected(); if (s.length) postMessage({ action: 'removeFromSource', solutions: s }); }}>Remove from Source</ToolbarButton>
         <ToolbarDivider />
         <ToolbarButton icon={<ArrowSwapRegular />} onClick={() => postMessage({ action: 'switchOrgs' })}>Switch</ToolbarButton>
         <ToolbarButton icon={<SearchRegular />} onClick={() => postMessage({ action: 'findMissingDeps' })}>Missing Deps</ToolbarButton>

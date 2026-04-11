@@ -167,6 +167,44 @@ namespace err403.SolutionManagment.Services
             }
         }
 
+        // ── Version bump ──
+
+        public static string BumpVersion(string currentVersion, string policy, string dateMask = "yyyy.MM.dd.x")
+        {
+            var parts = currentVersion.Split('.');
+            while (parts.Length < 4) parts = parts.Concat(new[] { "0" }).ToArray();
+
+            int major = int.TryParse(parts[0], out var m) ? m : 0;
+            int minor = int.TryParse(parts[1], out var mi) ? mi : 0;
+            int build = int.TryParse(parts[2], out var b) ? b : 0;
+            int revision = int.TryParse(parts[3], out var r) ? r : 0;
+
+            switch (policy)
+            {
+                case "Major": return $"{major + 1}.0.0.0";
+                case "Minor": return $"{major}.{minor + 1}.0.0";
+                case "Build": return $"{major}.{minor}.{build + 1}.0";
+                case "Revision": return $"{major}.{minor}.{build}.{revision + 1}";
+                case "Date":
+                    var now = DateTime.Now;
+                    var dateBase = dateMask
+                        .Replace("yyyy", now.Year.ToString())
+                        .Replace("MM", now.Month.ToString("D2"))
+                        .Replace("dd", now.Day.ToString("D2"))
+                        .Replace("HHmm", now.ToString("HHmm"));
+                    // Handle 'x' as incremental — start at 1, increment if same date prefix
+                    var prefix = dateBase.Substring(0, dateBase.IndexOf('x') >= 0 ? dateBase.IndexOf('x') : dateBase.Length);
+                    if (currentVersion.StartsWith(prefix))
+                    {
+                        var lastPart = currentVersion.Substring(prefix.Length);
+                        var lastNum = int.TryParse(lastPart, out var ln) ? ln : 0;
+                        return prefix + (lastNum + 1);
+                    }
+                    return dateBase.Replace("x", "1");
+                default: return currentVersion;
+            }
+        }
+
         // ── Export to disk ──
 
         public static string SaveSolutionToDisk(

@@ -33,6 +33,7 @@ namespace err403.SolutionManagment.Forms
         public event EventHandler<SolutionActionEventArgs> TransferSolutionsRequested;
         public event EventHandler<SolutionActionEventArgs> TransferWithSettingsRequested;
         public event EventHandler<SolutionActionEventArgs> ExportSolutionsRequested;
+        public event EventHandler<SolutionActionEventArgs> RemoveFromSourceRequested;
         public event EventHandler ImportFromFileRequested;
         public event EventHandler<SolutionActionEventArgs> RemoveFromTargetsRequested;
         public event EventHandler SwitchOrgsRequested;
@@ -254,6 +255,10 @@ namespace err403.SolutionManagment.Forms
                                 Settings = transferSettings
                             });
                         }
+                        break;
+
+                    case "removeFromSource":
+                        RaiseSolutionEvent(RemoveFromSourceRequested, msg);
                         break;
 
                     case "exportToFile":

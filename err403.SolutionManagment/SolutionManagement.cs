@@ -6,6 +6,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Client;
 using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Sdk.WebServiceClient;
+using Microsoft.Toolkit.Uwp.Notifications;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -61,6 +62,7 @@ namespace err403.SolutionManagment
             cfForm.ImportFromFileRequested += CfForm_ImportFromFileRequested;
             cfForm.ExportSolutionsRequested += CfForm_ExportRequested;
             cfForm.RemoveFromTargetsRequested += CfForm_RemoveFromTargetsRequested;
+            cfForm.RemoveFromSourceRequested += CfForm_RemoveFromSourceRequested;
             cfForm.SwitchOrgsRequested += CfForm_SwitchOrgsRequested;
             cfForm.FindMissingDepsRequested += CfForm_FindMissingDepsRequested;
 
@@ -365,6 +367,18 @@ namespace err403.SolutionManagment
             // Show progress panel in React
             cfForm.ShowProgress(true);
 
+            // Version bump if configured
+            if (settings != null && settings.UpdateSourceSolutionVersionNew == UpdateVersionEnum.Yes)
+            {
+                foreach (var sol in e.Solutions)
+                {
+                    var newVersion = SolutionTransferService.BumpVersion(
+                        sol.Version, settings.VersionSchema.ToString(), settings.VersionDateMask ?? "yyyy.MM.dd.x");
+                    SolutionTransferService.UpdateSolutionVersion(sourceService, System.Guid.Parse(sol.SolutionId), newVersion);
+                    sol.Version = newVersion;
+                }
+            }
+
             foreach (var sol in e.Solutions)
             {
                 foreach (var cd in AdditionalConnectionDetails)
@@ -382,6 +396,15 @@ namespace err403.SolutionManagment
                                 sourceService, sol.UniqueName, e.Settings.Managed);
                             if (!exportResult.Success)
                                 throw new Exception($"Export failed: {exportResult.ErrorMessage}");
+
+                            // Auto-save to disk if configured
+                            if (settings != null && settings.AutoExportSolutionsToDisk
+                                && !string.IsNullOrEmpty(settings.AutoExportSolutionsFolderPath))
+                            {
+                                SolutionTransferService.SaveSolutionToDisk(
+                                    exportResult.SolutionContent, sol.UniqueName, sol.Version,
+                                    e.Settings.Managed, settings.AutoExportSolutionsFolderPath);
+                            }
 
                             // Update progress on UI thread
                             Invoke(new System.Action(() =>
@@ -419,6 +442,19 @@ namespace err403.SolutionManagment
                                 error = we.Error?.Message ?? ""
                             });
                             cfForm.SendTransferResult(json);
+
+                            // Toast notification
+                            if (settings?.UseWindowsToastNotification == true)
+                            {
+                                try
+                                {
+                                    new ToastContentBuilder()
+                                        .AddText(we.Error == null ? "Transfer Complete" : "Transfer Failed")
+                                        .AddText($"{sol.FriendlyName} → {cd.ConnectionName}: {(we.Error == null ? "Success" : we.Error.Message)}")
+                                        .Show();
+                                }
+                                catch { /* toast may not be available */ }
+                            }
 
                             // Refresh target versions after transfer
                             FetchTargetSolutions(cd);
@@ -692,6 +728,37 @@ namespace err403.SolutionManagment
             }
 
             base.UpdateConnection(sourceService, sourceDetail, "", null);
+        }
+
+        // ── Remove from source ──
+
+        private void CfForm_RemoveFromSourceRequested(object sender, SolutionActionEventArgs e)
+        {
+            if (e.Solutions == null || e.Solutions.Count == 0) return;
+
+            var confirm = MessageBox.Show(this,
+                $"Remove {e.Solutions.Count} solution(s) from SOURCE environment? This cannot be undone.",
+                "Confirm Remove from Source", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (confirm != DialogResult.Yes) return;
+
+            foreach (var sol in e.Solutions)
+            {
+                WorkAsync(new WorkAsyncInfo
+                {
+                    Message = null,
+                    Work = (bw, we) =>
+                    {
+                        we.Result = SolutionRemovalService.RemoveFromSource(
+                            sol.UniqueName, sol.FriendlyName,
+                            System.Guid.Parse(sol.SolutionId), sourceService);
+                    },
+                    PostWorkCallBack = we =>
+                    {
+                        if (we.Error != null)
+                            MessageBox.Show(this, we.Error.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                });
+            }
         }
 
         // ── Find missing dependencies ──

@@ -51,6 +51,7 @@ export type BridgeMessage =
   | { action: 'importFromFile' }
   | { action: 'exportToFile'; solutions: SelectedSolution[] }
   | { action: 'removeFromTargets'; solutions: SelectedSolution[] }
+  | { action: 'removeFromSource'; solutions: SelectedSolution[] }
   | { action: 'switchOrgs' }
   | { action: 'findMissingDeps' }
   // Cloud Flows (SDK write: SetState)
