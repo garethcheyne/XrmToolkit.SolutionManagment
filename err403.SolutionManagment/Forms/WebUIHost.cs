@@ -71,6 +71,7 @@ namespace err403.SolutionManagment.Forms
 
         // Auth events
         public event EventHandler RefreshTokenRequested;
+        public event EventHandler AuthenticateGdsRequested;
 
         public WebUIHost()
         {
@@ -223,6 +224,10 @@ namespace err403.SolutionManagment.Forms
                     case "savePluginSettings":
                         if (msg.ContainsKey("settings"))
                             SavePluginSettingsRequested?.Invoke(this, new StringEventArgs { Value = msg["settings"].ToString() });
+                        break;
+
+                    case "authenticateGds":
+                        AuthenticateGdsRequested?.Invoke(this, EventArgs.Empty);
                         break;
 
                     case "openUrl":

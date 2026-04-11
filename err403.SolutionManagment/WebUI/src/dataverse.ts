@@ -146,24 +146,45 @@ export async function getCloudFlows() {
   return data.value;
 }
 
-// ── Organization Settings ──
+// ── Platform / Organization Settings ──
 
 export interface OrgSettingRecord {
   [key: string]: unknown;
   organizationid?: string;
 }
 
+export interface SettingDefinition {
+  uniquename: string;
+  displayname: string;
+  description: string;
+  settingtype: string; // Boolean, Number, String, Enum
+  defaultvalue: string;
+  groupname: string;
+  isoverridable: boolean;
+}
+
 export async function getOrgSettings() {
-  const data = await apiFetch<ODataResponse<OrgSettingRecord>>(
+  const data = await apiFetch<OrgSettingRecord>(
     `organizations?$select=organizationid`
   );
-  // Get the first org, then retrieve all columns
-  if (data.value.length === 0) return {};
-  const orgId = data.value[0]?.organizationid;
+  const values = (data as unknown as ODataResponse<OrgSettingRecord>).value;
+  if (!values || values.length === 0) return {};
+  const orgId = values[0]?.organizationid;
   if (!orgId) return {};
 
   const org = await apiFetch<OrgSettingRecord>(`organizations(${orgId})`);
   return org;
+}
+
+export async function getSettingDefinitions(): Promise<SettingDefinition[]> {
+  try {
+    // Try the RetrieveSettingList unbound function
+    const data = await apiFetch<{ Settings: SettingDefinition[] }>('RetrieveSettingList()');
+    return data.Settings ?? [];
+  } catch {
+    // Fallback: return empty if not available
+    return [];
+  }
 }
 
 // ── Write operations (still go through C# for SDK operations) ──

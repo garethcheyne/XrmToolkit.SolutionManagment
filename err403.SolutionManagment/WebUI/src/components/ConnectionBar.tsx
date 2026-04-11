@@ -140,8 +140,12 @@ export function ConnectionBar({ source, targets, onAbout }: ConnectionBarProps) 
           </Button>
         </Tooltip>
       </div>
+      <Button size="small" appearance="subtle" onClick={() => postMessage({ action: 'authenticateGds' })}
+        style={{ marginLeft: '4px' }}>
+        Authenticate
+      </Button>
       {onAbout && (
-        <Button size="small" appearance="subtle" onClick={onAbout} style={{ marginLeft: '4px' }}>
+        <Button size="small" appearance="subtle" onClick={onAbout}>
           About
         </Button>
       )}

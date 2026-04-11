@@ -12,8 +12,8 @@ import { postMessage } from '../bridge';
 
 const useStyles = makeStyles({
   drawer: {
-    width: '320px',
-    minWidth: '320px',
+    width: '420px',
+    minWidth: '420px',
     borderLeft: `1px solid ${tokens.colorNeutralStroke1}`,
   },
   body: {
@@ -44,6 +44,9 @@ const useStyles = makeStyles({
     justifyContent: 'flex-end',
     gap: '8px',
   },
+  divider:{
+    flexGrow: 0,
+  }
 });
 
 interface EnvVarEditPanelProps {
@@ -135,7 +138,7 @@ export function EnvVarEditPanel({ open, onClose, variable, targets, targetEnvVar
           Copy source to all targets
         </Button>
 
-        <Divider />
+        <Divider className={styles.divider} />
 
         <div className={styles.targetSection}>
           {targets.map((t) => (

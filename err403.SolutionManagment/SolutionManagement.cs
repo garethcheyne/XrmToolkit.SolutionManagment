@@ -69,6 +69,16 @@ namespace err403.SolutionManagment
             // Settings persistence
             cfForm.SavePluginSettingsRequested += CfForm_SavePluginSettingsRequested;
 
+            // GDS auth
+            cfForm.AuthenticateGdsRequested += (s, ev) =>
+            {
+                if (sourceDetail == null) return;
+                AppCode.EnvironmentIdResolver.AuthenticateInteractively(sourceDetail, this);
+                var auth = TokenService.GetAuthContext(sourceDetail);
+                cfForm.SetAuthContext(auth.OrgUrl, auth.Token, auth.EnvironmentId);
+                cfForm.SetSourceEnvironment(auth.EnvironmentId);
+            };
+
             Controls.Add(cfForm);
         }
 
@@ -363,6 +373,18 @@ namespace err403.SolutionManagment
         private void CfForm_StartTransferRequested(object sender, StartTransferEventArgs e)
         {
             if (e.Solutions == null || e.Solutions.Count == 0 || !AdditionalConnectionDetails.Any()) return;
+
+            // Connection reference check
+            var solutionIds = e.Solutions.Select(s => System.Guid.Parse(s.SolutionId)).ToList();
+            var connRefWarnings = ConnectionRefCheckService.Check(sourceService, solutionIds, AdditionalConnectionDetails.ToList());
+            if (connRefWarnings.Count > 0)
+            {
+                var warningMsg = string.Join("\n", connRefWarnings.Select(w => w.Message));
+                var proceed = MessageBox.Show(this,
+                    $"Connection reference warnings:\n\n{warningMsg}\n\nProceed with transfer?",
+                    "Connection References", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (proceed != DialogResult.Yes) return;
+            }
 
             // Show progress panel in React
             cfForm.ShowProgress(true);

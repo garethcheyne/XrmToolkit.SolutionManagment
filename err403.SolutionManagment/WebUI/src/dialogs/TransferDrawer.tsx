@@ -18,6 +18,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    padding: '12px 16px',
   },
   section: {
     display: 'flex',

@@ -63,6 +63,7 @@ export type BridgeMessage =
   | { action: 'removeTarget'; connectionName: string }
   | { action: 'refreshToken' }
   | { action: 'openUrl'; url: string }
+  | { action: 'authenticateGds' }
   // Settings persistence
   | { action: 'savePluginSettings'; settings: string };
 

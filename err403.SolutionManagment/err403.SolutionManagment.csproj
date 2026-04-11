@@ -96,6 +96,7 @@
     <Compile Include="Services\SolutionRemovalService.cs" />
     <Compile Include="Services\SolutionTransferService.cs" />
     <Compile Include="Services\MissingDependencyService.cs" />
+    <Compile Include="Services\ConnectionRefCheckService.cs" />
     <Compile Include="Services\TargetQueryService.cs" />
     <!-- Core -->
     <Compile Include="Plugin.cs" />
