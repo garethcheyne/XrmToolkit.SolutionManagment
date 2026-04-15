@@ -1,0 +1,30 @@
+{
+  "getting-started": {
+    "title": "Getting Started",
+    "icon": "Rocket"
+  },
+  "solutions": {
+    "title": "Solutions",
+    "icon": "Package"
+  },
+  "settings": {
+    "title": "Settings",
+    "icon": "Settings"
+  },
+  "cloud-flows": {
+    "title": "Cloud Flows",
+    "icon": "Zap"
+  },
+  "environment-variables": {
+    "title": "Environment Variables",
+    "icon": "Database"
+  },
+  "platform-settings": {
+    "title": "Platform Settings",
+    "icon": "SlidersHorizontal"
+  },
+  "troubleshooting": {
+    "title": "Troubleshooting",
+    "icon": "AlertTriangle"
+  }
+}

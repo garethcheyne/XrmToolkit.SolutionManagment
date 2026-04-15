@@ -12,6 +12,7 @@
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <RuntimeIdentifiers>win</RuntimeIdentifiers>
     <AssemblyInfoFilePath>Properties\AssemblyInfo.cs</AssemblyInfoFilePath>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
@@ -87,6 +88,7 @@
     <None Include="err403.SolutionManagment.nuspec" />
     <!-- Forms -->
     <Compile Include="Forms\WebUIHost.cs"><SubType>UserControl</SubType></Compile>
+    <Compile Include="Forms\HelpWindow.cs"><SubType>Form</SubType></Compile>
     <!-- Types -->
     <Compile Include="Types\FlowTypes.cs" />
     <Compile Include="Types\Requests.cs" />

@@ -150,3 +150,27 @@ window.bridge.exportComplete({ filePath })
 3. Activate flows → C# SetState → React shows results
 4. Export → C# saves ZIP → React shows completion
 5. All old WinForms dialogs gone
+
+---
+
+## Status — April 2026
+
+### ✅ Completed (this port)
+- All 5 wiring/implementation gaps fixed (activeImportsDetected, ImportFromFile async, RemoveFromTargets feedback, FindMissingDeps full implementation, version-skip bug)
+- TeachingPopovers on all key settings with MS Learn links
+- MissingDepsDialog created and wired
+- React builds: 2452 modules, 1,165 KB, 3.3s
+- C# builds: Exit 0 via VS MSBuild
+
+### ✅ Test Infrastructure Added
+- Vitest 3 + jsdom for React (39 tests)
+- xUnit 2.9 for C# / net48 (37 tests)
+- Combined PDF+Markdown report at `/reports/` via `npm run report:test`
+- 76/76 tests passing
+
+### ⬜ Remaining
+- React component render tests (TransferConfirmDialog, MissingDepsDialog)
+- Additional C# service tests (MissingDependencyService, SolutionRemovalService)
+- CI pipeline test step in azure-pipelines.yml
+- Env var save deduplication helper
+- Slim SolutionManagement.cs further

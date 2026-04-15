@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Xml.Serialization;
 using XrmToolBox.Extensibility;
 
@@ -53,6 +55,47 @@ namespace err403.SolutionManagment.AppCode
         Date
     }
 
+    /// <summary>
+    /// XML-serializable entry for per-solution profiles (surrogate for Dictionary).
+    /// </summary>
+    public class SolutionProfileEntry
+    {
+        [XmlAttribute]
+        public string SolutionName { get; set; }
+        public SolutionProfile Profile { get; set; } = new SolutionProfile();
+    }
+
+    /// <summary>
+    /// Per-solution settings profile. Overrides connection-level defaults for a specific solution.
+    /// </summary>
+    public class SolutionProfile
+    {
+        public bool Managed { get; set; } = true;
+        public bool ExportAsync { get; set; } = true;
+        public bool ExportAutoNumberingSettings { get; set; }
+        public bool ExportCalendarSettings { get; set; }
+        public bool ExportCustomizationSettings { get; set; }
+        public bool ExportEmailTrackingSettings { get; set; }
+        public bool ExportExternalApplications { get; set; }
+        public bool ExportGeneralSettings { get; set; }
+        public bool ExportIsvConfig { get; set; }
+        public bool ExportMarketingSettings { get; set; }
+        public bool ExportOutlookSynchronizationSettings { get; set; }
+        public bool ExportRelationshipRoles { get; set; }
+        public bool ExportSales { get; set; }
+        public ImportModeEnum ImportMode { get; set; }
+        public bool CheckForMissingDependencies { get; set; }
+        public bool ConvertToManaged { get; set; }
+        public bool DeployMissingPackages { get; set; } = true;
+        public bool OverwriteUnmanagedCustomizations { get; set; } = true;
+        public bool PublishWorkflows { get; set; } = true;
+        public bool SkipProductUpdateDependencies { get; set; }
+        public bool PublishCustomizations { get; set; }
+        public UpdateVersionEnum UpdateVersion { get; set; }
+        public VersionType VersionPolicy { get; set; }
+        public string VersionDateMask { get; set; }
+    }
+
     public class Settings : ICloneable
     {
         public Settings()
@@ -68,6 +111,33 @@ namespace err403.SolutionManagment.AppCode
         [DisplayName("\tAuto save solutions")]
         [Description("Sets wether to save exported solutions to disk")]
         public bool AutoExportSolutionsToDisk { get; set; }
+
+        [Browsable(false)]
+        [XmlIgnore]
+        public Dictionary<string, SolutionProfile> SolutionProfiles { get; set; } = new Dictionary<string, SolutionProfile>();
+
+        /// <summary>
+        /// XML-serializable surrogate for SolutionProfiles dictionary.
+        /// </summary>
+        [Browsable(false)]
+        [XmlArray("SolutionProfileEntries")]
+        [XmlArrayItem("Entry")]
+        public List<SolutionProfileEntry> SolutionProfilesList
+        {
+            get => SolutionProfiles.Select(kvp => new SolutionProfileEntry { SolutionName = kvp.Key, Profile = kvp.Value }).ToList();
+            set
+            {
+                SolutionProfiles = new Dictionary<string, SolutionProfile>();
+                if (value != null)
+                {
+                    foreach (var entry in value)
+                    {
+                        if (!string.IsNullOrEmpty(entry.SolutionName))
+                            SolutionProfiles[entry.SolutionName] = entry.Profile ?? new SolutionProfile();
+                    }
+                }
+            }
+        }
 
         [Category("Import Settings")]
         [DisplayName("Check for missing dependencies")]
@@ -251,8 +321,19 @@ Upgrade: Install a new version of the solution and remove missing components")]
                 VersionDateMask = VersionDateMask,
                 ShowPreImportSummary = ShowPreImportSummary,
                 DeployMissingPackagesBeforeSolutionImport = DeployMissingPackagesBeforeSolutionImport,
-                UseWindowsToastNotification = UseWindowsToastNotification
+                UseWindowsToastNotification = UseWindowsToastNotification,
+                SolutionProfiles = new Dictionary<string, SolutionProfile>(SolutionProfiles)
             };
+        }
+
+        /// <summary>
+        /// Gets the per-solution profile if one exists, otherwise returns null (use connection defaults).
+        /// </summary>
+        public SolutionProfile GetProfile(string solutionUniqueName)
+        {
+            if (string.IsNullOrEmpty(solutionUniqueName)) return null;
+            SolutionProfiles.TryGetValue(solutionUniqueName, out var profile);
+            return profile;
         }
 
         public void Save(string name = null)

@@ -17,6 +17,11 @@ import {
 import { postMessage } from '../bridge';
 import type { SourceConnection, TargetConnection } from '../types';
 
+const blinkKeyframes = {
+  '0%, 100%': { opacity: 1 },
+  '50%': { opacity: 0.2 },
+};
+
 const useStyles = makeStyles({
   root: {
     display: 'flex',
@@ -28,6 +33,15 @@ const useStyles = makeStyles({
     flexShrink: 0,
     minHeight: '40px',
     flexWrap: 'wrap',
+  },
+  authWarning: {
+    color: tokens.colorPaletteRedForeground1,
+    fontSize: '8px',
+    animationName: blinkKeyframes,
+    animationDuration: '1.2s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out',
+    marginRight: '-4px',
   },
   sourceSection: {
     display: 'flex',
@@ -80,10 +94,11 @@ const useStyles = makeStyles({
 interface ConnectionBarProps {
   source: SourceConnection;
   targets: TargetConnection[];
+  hasEnvironmentId?: boolean;
   onAbout?: () => void;
 }
 
-export function ConnectionBar({ source, targets, onAbout }: ConnectionBarProps) {
+export function ConnectionBar({ source, targets, hasEnvironmentId, onAbout }: ConnectionBarProps) {
   const styles = useStyles();
 
   return (
@@ -140,10 +155,17 @@ export function ConnectionBar({ source, targets, onAbout }: ConnectionBarProps) 
           </Button>
         </Tooltip>
       </div>
-      <Button size="small" appearance="subtle" onClick={() => postMessage({ action: 'authenticateGds' })}
-        style={{ marginLeft: '4px' }}>
-        Authenticate
-      </Button>
+      <Tooltip
+        content={hasEnvironmentId ? 'Authenticated — Maker Portal links available' : 'Not authenticated — click to enable Maker Portal links'}
+        relationship="label"
+      >
+        <Button size="small" appearance="subtle" onClick={() => postMessage({ action: 'authenticateGds' })}
+          style={{ marginLeft: '4px' }}
+          icon={!hasEnvironmentId ? <CircleFilled className={styles.authWarning} /> : undefined}
+        >
+          Authenticate
+        </Button>
+      </Tooltip>
       {onAbout && (
         <Button size="small" appearance="subtle" onClick={onAbout}>
           About

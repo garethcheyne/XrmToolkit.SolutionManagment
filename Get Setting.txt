@@ -1,0 +1,90 @@
+Request URL
+https://nzicecrp01.crm6.dynamics.com/api/data/v9.0/organizations
+Request Method
+GET
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+origin
+
+
+Request URL
+https://nzicecrp01.crm6.dynamics.com/api/data/v9.0/IsPaiEnabled
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+origin
+
+
+Request URL
+https://nzicecrp01.crm6.dynamics.com/api/data/v9.0/RetrieveVersion
+Request Method
+GET
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+origin
+
+Request URL
+https://nzicecrp01.crm6.dynamics.com/api/data/v9.0/recyclebinconfigs?$filter=_extensionofrecordid_value%20eq%20%27e1bd1119-6e9d-45a4-bc15-12051e65a0bd%27
+Request Method
+GET
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+origin
+
+Request URL
+https://nzicecrp01.crm6.dynamics.com/api/search/v1.0/status
+Request Method
+GET
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+origin
+
+
+Request URL
+https://nzicecrp01.crm6.dynamics.com/api/data/v9.0/RetrieveSettingList()
+Request Method
+GET
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+orig
+
+Request URL
+https://nzicecrp01.crm6.dynamics.com/api/data/v9.0/GetFeatureEnabledState
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+origin
+
+equest URL
+https://nzicecrp01.crm6.dynamics.com/api/data/v9.0/RetrieveFeatureControlSetting
+Request Method
+POST
+Status Code
+200 OK
+Remote Address
+20.40.182.180:443
+Referrer Policy
+origin

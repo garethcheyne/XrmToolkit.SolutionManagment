@@ -1,30 +1,50 @@
+import { useMemo, useState, useEffect } from 'react';
 import {
-  Text, ProgressBar,
-  makeStyles, tokens, Button,
+  Text,
+  makeStyles, tokens, Button, Divider,
 } from '@fluentui/react-components';
 import {
-  CheckmarkCircleFilled, DismissCircleFilled,
-  ArrowClockwiseRegular,
+  ArrowClockwiseRegular, ArrowDownloadRegular, ArrowUploadRegular,
+  CloudArrowUpRegular,
 } from '@fluentui/react-icons';
 import { postMessage } from '../bridge';
+import { Panel } from '../components/Panel';
+import { ProgressCard } from '../cards/ProgressCard';
 
 const useStyles = makeStyles({
-  root: {
+  phaseSection: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderLeft: `1px solid ${tokens.colorNeutralStroke1}`,
-    overflow: 'auto',
-    width: '300px',
-    minWidth: '300px',
+    gap: '2px',
   },
-  header: {
-    padding: '8px 12px',
+  phaseHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '6px 0',
+    fontSize: '11px',
     fontWeight: 600,
-    fontSize: '12px',
-    borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
-    backgroundColor: tokens.colorNeutralBackground3,
+    textTransform: 'uppercase',
+    color: tokens.colorNeutralForeground3,
+    letterSpacing: '0.5px',
+  },
+  phaseIcon: {
+    fontSize: '14px',
+    color: tokens.colorBrandForeground1,
+  },
+  targetGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    marginLeft: '8px',
+    paddingLeft: '8px',
+    borderLeft: `2px solid ${tokens.colorNeutralStroke2}`,
+  },
+  targetLabel: {
+    fontSize: '10px',
+    fontWeight: 600,
+    color: tokens.colorNeutralForeground2,
+    padding: '4px 0 2px 0',
   },
   emptyState: {
     display: 'flex',
@@ -36,52 +56,20 @@ const useStyles = makeStyles({
     gap: '4px',
     color: tokens.colorNeutralForeground4,
   },
-  itemList: {
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '4px 0',
-  },
-  item: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    padding: '8px 12px',
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  itemHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  itemAction: {
-    fontWeight: 600,
-    fontSize: '11px',
-    flex: 1,
-  },
-  itemDirection: {
-    fontSize: '10px',
-    color: tokens.colorNeutralForeground3,
-  },
-  itemStatus: {
-    fontSize: '10px',
-    color: tokens.colorNeutralForeground3,
-  },
-  successIcon: { color: tokens.colorPaletteGreenForeground1 },
-  errorIcon: { color: tokens.colorPaletteRedForeground1 },
-  retryBar: {
-    padding: '8px 12px',
-    borderTop: `1px solid ${tokens.colorNeutralStroke1}`,
-    backgroundColor: tokens.colorNeutralBackground3,
-  },
+  divider: { flexGrow: 0 },
 });
 
 export interface ProgressItemData {
   id: string;
   action: string;
   direction: string;
+  target?: string;
+  phase?: 'export' | 'import' | 'publish';
   status: 'pending' | 'running' | 'success' | 'error' | 'timeout' | 'skipped';
   percentage?: number;
   elapsed?: string;
+  startedAt?: string;
+  elapsedMs?: number;
   errorMessage?: string;
 }
 
@@ -89,68 +77,113 @@ interface ProgressPanelProps {
   items: ProgressItemData[];
   visible: boolean;
   showRetry?: boolean;
+  onClose: () => void;
 }
 
-export function ProgressPanel({ items, visible, showRetry }: ProgressPanelProps) {
+export function ProgressPanel({ items, visible, showRetry, onClose }: ProgressPanelProps) {
   const styles = useStyles();
+
+  // Tick every second to update live elapsed counters
+  const [now, setNow] = useState(Date.now());
+  const hasRunning = items.some((i) => i.status === 'running');
+  useEffect(() => {
+    if (!hasRunning) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [hasRunning]);
+
+  const { exportItems, targetGroups } = useMemo(() => {
+    const exports = items.filter((i) => (i.phase ?? 'export') === 'export');
+    // Group import/publish by target
+    const importPublish = items.filter((i) => i.phase === 'import' || i.phase === 'publish');
+    const grouped = new Map<string, { imports: ProgressItemData[]; publishes: ProgressItemData[] }>();
+    importPublish.forEach((i) => {
+      const t = i.target ?? i.direction ?? '';
+      if (!grouped.has(t)) grouped.set(t, { imports: [], publishes: [] });
+      const g = grouped.get(t)!;
+      if (i.phase === 'import') g.imports.push(i);
+      else g.publishes.push(i);
+    });
+    return { exportItems: exports, targetGroups: grouped };
+  }, [items]);
 
   if (!visible) return null;
 
+  const hasTargets = targetGroups.size > 0;
+
+  const footer = showRetry ? (
+    <Button size="small" appearance="primary" icon={<ArrowClockwiseRegular />}
+      onClick={() => postMessage({ action: 'retryTransfer' } as never)}>
+      Retry
+    </Button>
+  ) : undefined;
+
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>Transfer Progress</div>
+    <Panel title="Transfer Progress" onClose={onClose} footer={footer}>
       {items.length === 0 ? (
         <div className={styles.emptyState}>
           <Text size={200}>Start a transfer to see progress</Text>
         </div>
       ) : (
-        <div className={styles.itemList}>
-          {items.map((item) => (
-            <div key={item.id} className={styles.item}>
-              <div className={styles.itemHeader}>
-                {item.status === 'success' && <CheckmarkCircleFilled className={styles.successIcon} fontSize={16} />}
-                {item.status === 'error' && <DismissCircleFilled className={styles.errorIcon} fontSize={16} />}
-                <Text className={styles.itemAction} truncate wrap={false} title={item.action}>{item.action}</Text>
-              </div>
-              <Text className={styles.itemDirection}>{item.direction}</Text>
-
-              {item.status === 'running' && (
-                <ProgressBar
-                  value={item.percentage !== undefined ? item.percentage / 100 : undefined}
-                  color="brand"
-                  thickness="medium"
-                />
-              )}
-
-              {item.status === 'running' && (
-                <Text className={styles.itemStatus}>{item.elapsed}</Text>
-              )}
-
-              {item.status === 'error' && item.elapsed && (
-                <Text className={styles.itemStatus} style={{ color: tokens.colorPaletteRedForeground1 }}>
-                  {item.elapsed}
-                </Text>
-              )}
-
-              {item.status === 'success' && (
-                <ProgressBar value={1} color="success" thickness="medium" />
-              )}
-
-              {item.status === 'error' && (
-                <ProgressBar value={1} color="error" thickness="medium" />
-              )}
+        <>
+          {/* Phase 1: Export (Source) */}
+          <div className={styles.phaseSection}>
+            <div className={styles.phaseHeader}>
+              <ArrowUploadRegular className={styles.phaseIcon} />
+              Export (Source)
             </div>
-          ))}
-        </div>
+            {exportItems.map((item) => (
+              <ProgressCard key={item.id} item={item} now={now} />
+            ))}
+          </div>
+
+          {hasTargets && (
+            <>
+              <Divider className={styles.divider} />
+
+              {/* Phase 2: Import (per target) */}
+              <div className={styles.phaseSection}>
+                <div className={styles.phaseHeader}>
+                  <ArrowDownloadRegular className={styles.phaseIcon} />
+                  Import (Targets)
+                </div>
+                {Array.from(targetGroups.entries()).map(([target, group]) => (
+                  <div key={`import-${target}`} className={styles.targetGroup}>
+                    <Text className={styles.targetLabel}>{target}</Text>
+                    {group.imports.map((item) => (
+                      <ProgressCard key={item.id} item={item} now={now} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              <Divider className={styles.divider} />
+
+              {/* Phase 3: Publish (per target) */}
+              <div className={styles.phaseSection}>
+                <div className={styles.phaseHeader}>
+                  <CloudArrowUpRegular className={styles.phaseIcon} />
+                  Publish (Targets)
+                </div>
+                {Array.from(targetGroups.entries()).map(([target, group]) => (
+                  <div key={`publish-${target}`} className={styles.targetGroup}>
+                    <Text className={styles.targetLabel}>{target}</Text>
+                    {group.publishes.length > 0 ? (
+                      group.publishes.map((item) => (
+                        <ProgressCard key={item.id} item={item} now={now} />
+                      ))
+                    ) : (
+                      <Text size={200} style={{ color: tokens.colorNeutralForeground4, padding: '4px 8px' }}>
+                        Waiting for import...
+                      </Text>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
-      {showRetry && (
-        <div className={styles.retryBar}>
-          <Button size="small" appearance="primary" icon={<ArrowClockwiseRegular />}
-            onClick={() => postMessage({ action: 'retryTransfer' } as never)}>
-            Retry
-          </Button>
-        </div>
-      )}
-    </div>
+    </Panel>
   );
 }

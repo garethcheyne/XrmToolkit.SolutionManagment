@@ -171,6 +171,7 @@ export function CloudFlowsTab({ targets, targetFlowData }: CloudFlowsTabProps) {
                 onChange={() => {
                   postMessage({
                     action: isOn ? 'deactivateFlows' : 'activateFlows',
+                    targetName: t.name,
                     flows: [{ name: item.name, workflowId: item.workflowId, stateCode: item.stateCode }],
                   });
                 }}
@@ -250,11 +251,15 @@ export function CloudFlowsTab({ targets, targetFlowData }: CloudFlowsTabProps) {
           <Menu open onOpenChange={() => setContextMenu(null)}>
             <MenuTrigger><span /></MenuTrigger>
             <MenuPopover><MenuList>
-              <MenuItem icon={<OpenRegular />} onClick={() => {
+              <MenuItem icon={<OpenRegular />} disabled={!auth?.environmentId} onClick={() => {
                 const envId = auth?.environmentId;
-                if (envId) postMessage({ action: 'openUrl', url: `https://make.powerapps.com/environments/${envId}/solutions/fd140aaf-4df4-11dd-bd17-0019b9312238/objects/cloudflows/${contextMenu.flowId}/view` });
+                if (envId) {
+                  postMessage({ action: 'openUrl', url: `https://make.powerapps.com/environments/${envId}/solutions/fd140aaf-4df4-11dd-bd17-0019b9312238/objects/cloudflows/${contextMenu.flowId}/view` });
+                } else {
+                  postMessage({ action: 'authenticateGds' });
+                }
                 setContextMenu(null);
-              }}>Open in Power Automate</MenuItem>
+              }}>Open in Power Automate{!auth?.environmentId ? ' (auth required)' : ''}</MenuItem>
             </MenuList></MenuPopover>
           </Menu>
         </div>

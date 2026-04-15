@@ -12,6 +12,9 @@ import { useQuery } from '@tanstack/react-query';
 import { getEnvVarDefinitions, getEnvVarValues } from '../dataverse';
 import { getAuth } from '../auth';
 import { EnvVarEditPanel } from '../panels/EnvVarEditPanel';
+import { Allotment } from 'allotment';
+import 'allotment/dist/style.css';
+import { postMessage } from '../bridge';
 import type { TargetConnection } from '../types';
 
 const useStyles = makeStyles({
@@ -26,7 +29,7 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2, flexShrink: 0,
   },
   searchBox: { flex: '1 1 auto', maxWidth: '280px', minWidth: '150px' },
-  gridContainer: { flex: 1, overflow: 'auto' },
+  gridContainer: { height: '100%', overflow: 'auto' },
   headerCell: { fontWeight: 700, fontSize: '12px', backgroundColor: tokens.colorNeutralBackground3 },
   matchCell: { color: tokens.colorPaletteGreenForeground1 },
   mismatchCell: { color: tokens.colorPaletteRedForeground1 },
@@ -58,6 +61,7 @@ interface EnvVarRow {
   definitionId: string;
   displayName: string;
   schemaName: string;
+  description: string;
   type: string;
   defaultValue: string;
   currentValue: string;
@@ -74,6 +78,8 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
   const auth = getAuth();
   const [search, setSearch] = useState('');
   const [showSchema, setShowSchema] = useState(false);
+  const [showDefaults, setShowDefaults] = useState(true);
+  const [showDescription, setShowDescription] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<SelectionItemId>>(new Set());
   const [editVar, setEditVar] = useState<EnvVarRow | null>(null);
 
@@ -96,6 +102,7 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
         definitionId: def.environmentvariabledefinitionid,
         displayName: def.displayname ?? '',
         schemaName: def.schemaname ?? '',
+        description: def.description ?? '',
         type: getTypeName(def.type),
         defaultValue: def.defaultvalue ?? '',
         currentValue: val?.value ?? '',
@@ -109,14 +116,19 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
   // For now, target comparison is handled in the columns
 
   const filteredRows = useMemo(() => {
-    if (!search) return rows;
+    let result = rows;
+    if (!showDefaults) {
+      result = result.filter((ev) => ev.currentValue !== '');
+    }
+    if (!search) return result;
     const lower = search.toLowerCase();
-    return rows.filter((ev) =>
+    return result.filter((ev) =>
       ev.displayName.toLowerCase().includes(lower) ||
       ev.schemaName.toLowerCase().includes(lower) ||
-      ev.type.toLowerCase().includes(lower)
+      ev.type.toLowerCase().includes(lower) ||
+      ev.description.toLowerCase().includes(lower)
     );
-  }, [rows, search]);
+  }, [rows, search, showDefaults]);
 
   const columns = useMemo(() => {
     const cols: TableColumnDefinition<EnvVarRow>[] = [
@@ -130,6 +142,13 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
       cols.push(createTableColumn({ columnId: 'schemaName', compare: (a, b) => a.schemaName.localeCompare(b.schemaName),
         renderHeaderCell: () => 'Schema Name',
         renderCell: (item) => <Text truncate wrap={false} size={200}>{item.schemaName}</Text>,
+      }));
+    }
+
+    if (showDescription) {
+      cols.push(createTableColumn({ columnId: 'description', compare: (a, b) => (a.description ?? '').localeCompare(b.description ?? ''),
+        renderHeaderCell: () => 'Description',
+        renderCell: (item) => <Text truncate wrap={false} size={200} title={item.description}>{item.description || '—'}</Text>,
       }));
     }
 
@@ -170,7 +189,7 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
     }
 
     return cols;
-  }, [showSchema, targets, targetEnvVarData, styles]);
+  }, [showSchema, showDescription, targets, targetEnvVarData, styles]);
 
   const onSelectionChange: DataGridProps['onSelectionChange'] = useCallback(
     (_e: unknown, data: { selectedItems: Set<SelectionItemId> }) => setSelectedItems(data.selectedItems), []);
@@ -190,10 +209,10 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
           onClick={() => {
             const selected = filteredRows.filter(r => selectedItems.has(r.definitionId));
             if (selected.length > 0) {
-              import('../bridge').then(b => b.postMessage({
-                action: 'startTransfer' as never,
+              postMessage({
+                action: 'transferEnvVars',
                 items: selected.map(r => ({ schemaName: r.schemaName, displayName: r.displayName, sourceValue: r.currentValue, definitionId: r.definitionId })),
-              } as never));
+              });
             }
           }}>Transfer Selected</ToolbarButton>
       </Toolbar>
@@ -202,44 +221,52 @@ export function EnvironmentVarsTab({ targets, targetEnvVarData }: EnvironmentVar
         <SearchBox className={styles.searchBox} placeholder="Search variables..." value={search}
           onChange={(_e, data) => setSearch(data.value)} />
         <Switch label="Schema names" checked={showSchema} onChange={(_e, data) => setShowSchema(data.checked)} />
+        <Switch label="Description" checked={showDescription} onChange={(_e, data) => setShowDescription(data.checked)} />
+        <Switch label="Show defaults" checked={showDefaults} onChange={(_e, data) => setShowDefaults(data.checked)} />
         <Badge className={styles.countBadge} appearance="tint" color="informative" size="medium">
           {filteredRows.length} variable{filteredRows.length !== 1 ? 's' : ''}
           {selectedItems.size > 0 ? ` (${selectedItems.size} selected)` : ''}
         </Badge>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {filteredRows.length === 0 ? (
-          <div className={styles.emptyState}>
-            <Text size={400} weight="semibold">{!auth ? 'Not connected' : 'No environment variables found'}</Text>
-            <Text size={200}>{!auth ? 'Connect to a source environment first.' : 'Try adjusting your search.'}</Text>
-          </div>
-        ) : (
-          <div className={styles.gridContainer}>
-            <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
-              selectedItems={selectedItems} onSelectionChange={onSelectionChange}
-              getRowId={(item) => item.definitionId} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
-              <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
-                <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
-              </DataGridHeader>
-              <DataGridBody<EnvVarRow>>
-                {({ item, rowId }) => (
-                  <DataGridRow<EnvVarRow> key={rowId} onDoubleClick={() => setEditVar(item)}>
-                    {({ renderCell }) => <DataGridCell>{renderCell(item)}</DataGridCell>}
-                  </DataGridRow>
-                )}
-              </DataGridBody>
-            </DataGrid>
-          </div>
-        )}
-        <EnvVarEditPanel
-          open={!!editVar}
-          onClose={() => setEditVar(null)}
-          variable={editVar}
-          targets={targets}
-          targetEnvVarData={targetEnvVarData}
-        />
-      </div>
+      <Allotment proportionalLayout={false}>
+          <Allotment.Pane>
+            {filteredRows.length === 0 ? (
+              <div className={styles.emptyState}>
+                <Text size={400} weight="semibold">{!auth ? 'Not connected' : 'No environment variables found'}</Text>
+                <Text size={200}>{!auth ? 'Connect to a source environment first.' : 'Try adjusting your search.'}</Text>
+              </div>
+            ) : (
+              <div className={styles.gridContainer}>
+                <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
+                  selectedItems={selectedItems} onSelectionChange={onSelectionChange}
+                  getRowId={(item) => item.definitionId} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
+                  <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
+                    <DataGridRow>{({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}</DataGridRow>
+                  </DataGridHeader>
+                  <DataGridBody<EnvVarRow>>
+                    {({ item, rowId }) => (
+                      <DataGridRow<EnvVarRow> key={rowId} onClick={() => setEditVar(item)}>
+                        {({ renderCell }) => <DataGridCell>{renderCell(item)}</DataGridCell>}
+                      </DataGridRow>
+                    )}
+                  </DataGridBody>
+                </DataGrid>
+              </div>
+            )}
+          </Allotment.Pane>
+          {!!editVar && (
+            <Allotment.Pane preferredSize={380} minSize={280} maxSize={550}>
+              <EnvVarEditPanel
+                open={!!editVar}
+                onClose={() => setEditVar(null)}
+                variable={editVar}
+                targets={targets}
+                targetEnvVarData={targetEnvVarData}
+              />
+            </Allotment.Pane>
+          )}
+        </Allotment>
     </div>
   );
 }

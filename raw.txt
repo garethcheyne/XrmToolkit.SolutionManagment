@@ -1,0 +1,133 @@
+Exception type: System.ServiceModel.FaultException`1[Microsoft.Xrm.Sdk.OrganizationServiceFault]
+Message: Solution manifest import: FAILURE: The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : <MissingDependencies canResolveAllMissingDependencies="False"><MissingDependency canResolveMissingDependency="False"><Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /><Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /></MissingDependency></MissingDependencies> , ProductUpdatesOnly : FalseDetail: 
+<OrganizationServiceFault xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/xrm/2011/Contracts">
+  <ActivityId>53780890-4df6-43b7-8251-3f6a19f580e0</ActivityId>
+  <ErrorCode>-2147188685</ErrorCode>
+  <ErrorDetails xmlns:d2p1="http://schemas.datacontract.org/2004/07/System.Collections.Generic">
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiExceptionSourceKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">Plugin/Microsoft.Crm.WebServices.ImportXmlService</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiSourceActivityKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string"></d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiExceptionOwnerKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">OwnershipNotFoundInExceptionOwnerSettings</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiOriginalExceptionKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionException: Solution manifest import: FAILURE: The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : &lt;MissingDependencies canResolveAllMissingDependencies="False"&gt;&lt;MissingDependency canResolveMissingDependency="False"&gt;&lt;Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;/MissingDependency&gt;&lt;/MissingDependencies&gt; , ProductUpdatesOnly : False ---&gt; Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionException: Solution manifest import: FAILURE: The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : &lt;MissingDependencies canResolveAllMissingDependencies="False"&gt;&lt;MissingDependency canResolveMissingDependency="False"&gt;&lt;Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;/MissingDependency&gt;&lt;/MissingDependencies&gt; , ProductUpdatesOnly : False ---&gt; Microsoft.Crm.CrmException: The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : &lt;MissingDependencies canResolveAllMissingDependencies="False"&gt;&lt;MissingDependency canResolveMissingDependency="False"&gt;&lt;Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;/MissingDependency&gt;&lt;/MissingDependencies&gt; , ProductUpdatesOnly : False
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.ThrowIfDependenciesMissingHelper(XmlNode solutionRoot, Boolean managed, Boolean isTelemetryEnabled)
+   at Microsoft.PowerApps.CoreFramework.ActivityLoggerExtensions.Execute(ILogger logger, EventId eventId, ActivityType activityType, Action action, IEnumerable`1 additionalCustomProperties)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.ThrowIfDependenciesMissing(XmlNode solutionRoot, Boolean managed)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.CheckImportPreConditions(Boolean checkMissingDependencies)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.ImportItem()
+   --- End of inner exception stack trace ---
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.ImportItem()
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportHandler.ImportInternal()
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportHandler.&lt;Import&gt;b__42_0()
+   at Microsoft.PowerApps.CoreFramework.ActivityLoggerExtensions.Execute(ILogger logger, EventId eventId, ActivityType activityType, Action action, IEnumerable`1 additionalCustomProperties)
+   at Microsoft.Xrm.Telemetry.XrmTelemetryExtensions.Execute(ILogger logger, XrmTelemetryActivityType activityType, Action action)
+   at Microsoft.Crm.Tools.ImportExportPublish.RootImportHandler.ImportAndUpdateProgress(ImportHandler ih)
+   at Microsoft.Crm.Tools.ImportExportPublish.RootImportHandler.ProcessHandlers(String[] importEntities, Hashtable ht, String&amp; curPath, ImportHandler&amp; ihForCurrentPath, CounterList listCounters)
+   at Microsoft.Crm.Tools.ImportExportPublish.RootImportHandler.RunImport(String[] importEntities)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportXml.&lt;&gt;c.&lt;RunImport&gt;b__188_0(ValueTuple`2 args)
+   at Microsoft.Crm.Platform.Sdk.Metadata.Partitioning.DaacMetadataSnapshotHelper.UseOwnStandardMetadataCache[TResult,TArg](IOrganizationContext context, Func`2 callback, TArg arg)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportXml.RunImport(String[] importEntities)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportXml.RunImport()
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportXml.RunImportInternal(Boolean withSolutionManifest)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportXml.&lt;&gt;c__DisplayClass173_0.&lt;RunImport&gt;b__0()
+   at Microsoft.PowerApps.CoreFramework.ActivityLoggerExtensions.Execute(ILogger logger, EventId eventId, ActivityType activityType, Action action, IEnumerable`1 additionalCustomProperties)
+   at Microsoft.Xrm.Telemetry.XrmTelemetryExtensions.Execute(ILogger logger, XrmTelemetryActivityType activityType, Action action)
+   at Microsoft.Crm.WebServices.ImportXmlService.ImportSolutionSkipCapableInternal(Boolean overwriteUnmanagedCustomizations, Boolean publishWorkflows, Byte[] customizationFile, Guid importJobId, Boolean convertToManaged, Boolean skipProductUpdateDependencies, Boolean holdingSolution, ExecutionContext context, Boolean skipQueueRibbonJob, LayerDesiredOrder layerDesiredOrder, Boolean asyncRibbonProcessing, EntityCollection componentParameters, Boolean isTemplateMode, String templateSuffix, SolutionParameters solutionParameters, String templateDisplayNamePrefix, Boolean stageAndUpgrade, Boolean schemaUpdatesOnly)
+   at Microsoft.Crm.WebServices.ImportXmlService.ImportSolutionSkipCapable(Boolean overwriteUnmanagedCustomizations, Boolean publishWorkflows, Byte[] customizationFile, Guid importJobId, Boolean convertToManaged, Boolean skipProductUpdateDependencies, Boolean holdingSolution, ExecutionContext context, Boolean skipQueueRibbonJob, LayerDesiredOrder layerDesiredOrder, Boolean asyncRibbonProcessing, EntityCollection componentParameters, Boolean isTemplateMode, String templateSuffix, SolutionParameters solutionParameters, String templateDisplayNamePrefix, Boolean stageAndUpgrade, Boolean schemaUpdatesOnly)
+   --- End of inner exception stack trace ---
+   at Microsoft.Crm.Extensibility.VersionedPluginProxyStepBase.Execute(PipelineExecutionContext context)
+   at Microsoft.Crm.Extensibility.PipelineInstrumentationHelper.Execute(Boolean instrumentationEnabled, String stopwatchName, ExecuteWithInstrumentation action, PipelineExecutionContext context)
+   at Microsoft.Crm.Extensibility.Pipeline.&lt;&gt;c__DisplayClass7_0.&lt;RunStep&gt;b__0()</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiStepKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://schemas.microsoft.com/2003/10/Serialization/" i:type="d4p1:guid">1b830950-e106-4ee1-b3fd-d348cb65dc8d</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiDepthKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:int">2</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiActivityIdKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://schemas.microsoft.com/2003/10/Serialization/" i:type="d4p1:guid">53780890-4df6-43b7-8251-3f6a19f580e0</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiPluginSolutionNameKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">System</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiStepSolutionNameKey</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">System</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiExceptionCategory</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">SystemFailure</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiExceptionMessageName</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">ImportSolutionError</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>ApiExceptionHttpStatusCode</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:int">500</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>0</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">Microsoft.Crm.CrmException: The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : &lt;MissingDependencies canResolveAllMissingDependencies="False"&gt;&lt;MissingDependency canResolveMissingDependency="False"&gt;&lt;Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;/MissingDependency&gt;&lt;/MissingDependencies&gt; , ProductUpdatesOnly : False
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.ThrowIfDependenciesMissingHelper(XmlNode solutionRoot, Boolean managed, Boolean isTelemetryEnabled)
+   at Microsoft.PowerApps.CoreFramework.ActivityLoggerExtensions.Execute(ILogger logger, EventId eventId, ActivityType activityType, Action action, IEnumerable`1 additionalCustomProperties)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.ThrowIfDependenciesMissing(XmlNode solutionRoot, Boolean managed)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.CheckImportPreConditions(Boolean checkMissingDependencies)
+   at Microsoft.Crm.Tools.ImportExportPublish.ImportSolutionHandler.ImportItem()</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>HasRetried</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">True</d2p1:value>
+    </KeyValuePairOfstringanyType>
+    <KeyValuePairOfstringanyType>
+      <d2p1:key>RetryExecutionStatus</d2p1:key>
+      <d2p1:value xmlns:d4p1="http://www.w3.org/2001/XMLSchema" i:type="d4p1:string">Microsoft.Crm.Core.Extensions.Retry.RetryExecutionStatus</d2p1:value>
+    </KeyValuePairOfstringanyType>
+  </ErrorDetails>
+  <HelpLink>http://go.microsoft.com/fwlink/?LinkID=398563&amp;error=Microsoft.Crm.CrmException%3a80048033&amp;client=platform</HelpLink>
+  <Message>Solution manifest import: FAILURE: The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : &lt;MissingDependencies canResolveAllMissingDependencies="False"&gt;&lt;MissingDependency canResolveMissingDependency="False"&gt;&lt;Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;/MissingDependency&gt;&lt;/MissingDependencies&gt; , ProductUpdatesOnly : False</Message>
+  <Timestamp>2026-04-10T08:00:43.0999664Z</Timestamp>
+  <ExceptionRetriable>false</ExceptionRetriable>
+  <ExceptionSource i:nil="true" />
+  <InnerFault>
+    <ActivityId>53780890-4df6-43b7-8251-3f6a19f580e0</ActivityId>
+    <ErrorCode>-2147188685</ErrorCode>
+    <ErrorDetails xmlns:d3p1="http://schemas.datacontract.org/2004/07/System.Collections.Generic" />
+    <HelpLink i:nil="true" />
+    <Message>Solution manifest import: FAILURE: The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : &lt;MissingDependencies canResolveAllMissingDependencies="False"&gt;&lt;MissingDependency canResolveMissingDependency="False"&gt;&lt;Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;/MissingDependency&gt;&lt;/MissingDependencies&gt; , ProductUpdatesOnly : False</Message>
+    <Timestamp>2026-04-10T08:00:43.0999664Z</Timestamp>
+    <ExceptionRetriable>false</ExceptionRetriable>
+    <ExceptionSource i:nil="true" />
+    <InnerFault>
+      <ActivityId>53780890-4df6-43b7-8251-3f6a19f580e0</ActivityId>
+      <ErrorCode>-2147188707</ErrorCode>
+      <ErrorDetails xmlns:d4p1="http://schemas.datacontract.org/2004/07/System.Collections.Generic" />
+      <HelpLink i:nil="true" />
+      <Message>The following solution cannot be imported: SecurityandRoles. Some dependencies are missing. The missing dependencies are : &lt;MissingDependencies canResolveAllMissingDependencies="False"&gt;&lt;MissingDependency canResolveMissingDependency="False"&gt;&lt;Required type="29" displayName="ARC: New Email (do not delete or rename)" solution="Active" id="{81c8453b-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;Dependent type="154" displayName="Email To Case" id="{15add702-522b-f111-88b4-000d3ad1e020}" /&gt;&lt;/MissingDependency&gt;&lt;/MissingDependencies&gt; , ProductUpdatesOnly : False</Message>
+      <Timestamp>2026-04-10T08:00:43.0999664Z</Timestamp>
+      <ExceptionRetriable>false</ExceptionRetriable>
+      <ExceptionSource i:nil="true" />
+      <InnerFault i:nil="true" />
+      <OriginalException i:nil="true" />
+      <TraceText i:nil="true" />
+    </InnerFault>
+    <OriginalException i:nil="true" />
+    <TraceText i:nil="true" />
+  </InnerFault>
+  <OriginalException i:nil="true" />
+  <TraceText i:nil="true" />
+</OrganizationServiceFault>

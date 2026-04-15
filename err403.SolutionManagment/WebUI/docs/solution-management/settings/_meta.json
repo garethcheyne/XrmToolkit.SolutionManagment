@@ -1,0 +1,17 @@
+{
+  "general": {
+    "title": "General Settings"
+  },
+  "export": {
+    "title": "Export Settings"
+  },
+  "import": {
+    "title": "Import Settings"
+  },
+  "version": {
+    "title": "Version Settings"
+  },
+  "solution-profiles": {
+    "title": "Per-Solution Profiles"
+  }
+}

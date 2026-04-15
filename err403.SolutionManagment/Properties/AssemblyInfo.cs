@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // Les informations générales relatives à un assembly dépendent de
@@ -20,6 +21,9 @@ using System.Runtime.InteropServices;
 
 // Le GUID suivant est pour l'ID de la typelib si ce projet est exposé à COM
 [assembly: Guid("25285670-3c9e-41b4-b54e-6efe8884c295")]
+
+// Allow the test project to access internal members
+[assembly: InternalsVisibleTo("err403.SolutionManagment.Tests")]
 
 // Les informations de version pour un assembly se composent des quatre valeurs suivantes :
 //

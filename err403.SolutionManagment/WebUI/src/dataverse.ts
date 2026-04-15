@@ -97,6 +97,7 @@ export interface EnvVarDefinition {
   environmentvariabledefinitionid: string;
   displayname: string;
   schemaname: string;
+  description: string;
   type: number;
   defaultvalue: string;
 }
@@ -109,7 +110,7 @@ export interface EnvVarValue {
 
 export async function getEnvVarDefinitions() {
   const data = await apiFetch<ODataResponse<EnvVarDefinition>>(
-    `environmentvariabledefinitions?$select=displayname,schemaname,type,defaultvalue` +
+    `environmentvariabledefinitions?$select=displayname,schemaname,description,type,defaultvalue` +
       `&$filter=statecode eq 0&$orderby=displayname asc`
   );
   return data.value;

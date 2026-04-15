@@ -42,6 +42,7 @@ type BridgeHandlers = {
   targetSolutions: (connectionName: string, json: string) => void;
   targetFlows: (connectionName: string, json: string) => void;
   targetEnvVars: (connectionName: string, json: string) => void;
+  targetOrgSettings: (connectionName: string, json: string) => void;
 
   // Plugin settings persistence
   loadPluginSettings: (json: string) => void;
@@ -51,6 +52,9 @@ type BridgeHandlers = {
   flowResults: (json: string) => void;
   missingDeps: (json: string) => void;
 
+  // Alerts (replaces WinForms MessageBox)
+  showAlert: (title: string, message: string, severity: string) => void;
+
   // Tab navigation
   setActiveTab: (tab: string) => void;
 
@@ -59,6 +63,9 @@ type BridgeHandlers = {
   updateProgressItem: (json: string) => void;
   showProgress: (visible: boolean) => void;
   showRetryButton: (show: boolean) => void;
+
+  // Active imports pre-flight
+  activeImportsDetected: (json: string) => void;
 };
 
 const handlers: Partial<BridgeHandlers> = {};
@@ -119,6 +126,7 @@ const bridgeApi = {
   targetSolutions: (cn: string, json: string) => callOrBuffer('targetSolutions', [cn, json]),
   targetFlows: (cn: string, json: string) => callOrBuffer('targetFlows', [cn, json]),
   targetEnvVars: (cn: string, json: string) => callOrBuffer('targetEnvVars', [cn, json]),
+  targetOrgSettings: (cn: string, json: string) => callOrBuffer('targetOrgSettings', [cn, json]),
 
   // Plugin settings
   loadPluginSettings: (json: string) => callOrBuffer('loadPluginSettings', [json]),
@@ -128,11 +136,18 @@ const bridgeApi = {
   flowResults: (json: string) => callOrBuffer('flowResults', [json]),
   missingDeps: (json: string) => callOrBuffer('missingDeps', [json]),
 
+  // Alerts (replaces WinForms MessageBox)
+  showAlert: (title: string, message: string, severity: string) =>
+    callOrBuffer('showAlert', [title, message, severity]),
+
   // Progress (C# manages these for write operations)
   setProgressItems: (json: string) => callOrBuffer('setProgressItems', [json]),
   updateProgressItem: (json: string) => callOrBuffer('updateProgressItem', [json]),
   showProgress: (visible: boolean) => callOrBuffer('showProgress', [visible]),
   showRetryButton: (show: boolean) => callOrBuffer('showRetryButton', [show]),
+
+  // Active imports pre-flight
+  activeImportsDetected: (json: string) => callOrBuffer('activeImportsDetected', [json]),
 
   // Tab
   setActiveTab: (tab: string) => callOrBuffer('setActiveTab', [tab]),

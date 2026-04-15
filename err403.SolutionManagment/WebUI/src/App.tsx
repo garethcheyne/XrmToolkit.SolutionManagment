@@ -13,17 +13,22 @@ import {
   GridRegular,
   SettingsRegular,
   DatabaseRegular,
+  BookRegular,
 } from '@fluentui/react-icons';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SolutionsTab } from './tabs/SolutionsTab';
 import { EnvironmentVarsTab } from './tabs/EnvironmentVarsTab';
 import { CloudFlowsTab } from './tabs/CloudFlowsTab';
 import { PlatformSettingsTab } from './tabs/PlatformSettingsTab';
+import { DocsViewer } from './tabs/DocsViewer';
 import { ConnectionBar } from './components/ConnectionBar';
 import { AboutDialog } from './dialogs/AboutDialog';
-import { ProgressPanel, type ProgressItemData } from './panels/ProgressPanel';
-import { defaultSettings, type PluginSettings } from './dialogs/SettingsDrawer';
+import { AlertDialog, emptyAlert, type AlertDialogState } from './dialogs/AlertDialog';
+import { ActiveImportsDialog, type ActiveImportInfo } from './dialogs/ActiveImportsDialog';
+import type { ProgressItemData } from './panels/ProgressPanel';
+import { defaultSettings, type PluginSettings } from './panels/SettingsPanel';
 import { setBridgeHandler, postMessage } from './bridge';
+import { onAuthChange, type AuthContext } from './auth';
 import type { SourceConnection, TargetConnection } from './types';
 
 const queryClient = new QueryClient({
@@ -61,7 +66,7 @@ const useStyles = makeStyles({
   },
 });
 
-type TabId = 'solutions' | 'envvars' | 'flows' | 'settings';
+type TabId = 'solutions' | 'envvars' | 'flows' | 'settings' | 'help';
 
 export function App() {
   const styles = useStyles();
@@ -75,10 +80,19 @@ export function App() {
   const [progressVisible, setProgressVisible] = useState(false);
   const [showRetry, setShowRetry] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [alertState, setAlertState] = useState<AlertDialogState>(emptyAlert);
   const [targetSolutionData, setTargetSolutionData] = useState<Record<string, Array<{ uniquename: string; version: string; ismanaged: boolean }>>>({});
   const [targetFlowData, setTargetFlowData] = useState<Record<string, Array<{ name: string; statecode: number; statuscode: number }>>>({});
   const [targetEnvVarData, setTargetEnvVarData] = useState<Record<string, Array<{ schemaname: string; value: string; exists: boolean }>>>({});
+  const [targetOrgSettingsData, setTargetOrgSettingsData] = useState<Record<string, Record<string, unknown>>>({});
   const [pluginSettings, setPluginSettings] = useState<PluginSettings>(defaultSettings);
+  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
+  const [activeImportsData, setActiveImportsData] = useState<Record<string, ActiveImportInfo[]>>({});
+  const [activeImportsOpen, setActiveImportsOpen] = useState(false);
+
+  useEffect(() => {
+    return onAuthChange((auth) => setAuthContext(auth));
+  }, []);
 
   const updateItem = useCallback((updated: ProgressItemData) => {
     setProgressItems((prev) => {
@@ -130,6 +144,10 @@ export function App() {
     setBridgeHandler('loadPluginSettings', (json: string) => {
       try {
         const saved: Partial<PluginSettings> = JSON.parse(json);
+        // Ensure solutionProfiles is always an object, never null
+        if (!saved.solutionProfiles || typeof saved.solutionProfiles !== 'object') {
+          saved.solutionProfiles = {};
+        }
         setPluginSettings((prev) => ({ ...prev, ...saved }));
       } catch { /* ignore parse errors */ }
     });
@@ -148,6 +166,21 @@ export function App() {
     setBridgeHandler('targetEnvVars', (connectionName: string, json: string) => {
       const vars: Array<{ schemaname: string; value: string; exists: boolean }> = JSON.parse(json);
       setTargetEnvVarData((prev) => ({ ...prev, [connectionName]: vars }));
+    });
+
+    setBridgeHandler('targetOrgSettings', (connectionName: string, json: string) => {
+      const settings: Record<string, unknown> = JSON.parse(json);
+      setTargetOrgSettingsData((prev) => ({ ...prev, [connectionName]: settings }));
+    });
+
+    // Alerts from C# (replaces WinForms MessageBox)
+    setBridgeHandler('showAlert', (title: string, message: string, severity: string) => {
+      setAlertState({
+        open: true,
+        title,
+        message,
+        severity: (severity as AlertDialogState['severity']) || 'info',
+      });
     });
 
     setBridgeHandler('setProgressItems', (json: string) => {
@@ -169,6 +202,12 @@ export function App() {
     setBridgeHandler('showRetryButton', (show: boolean) => {
       setShowRetry(show);
     });
+
+    setBridgeHandler('activeImportsDetected', (json: string) => {
+      const data: Record<string, ActiveImportInfo[]> = JSON.parse(json);
+      setActiveImportsData(data);
+      setActiveImportsOpen(true);
+    });
   }, [updateItem]);
 
   const handleSettingsChange = useCallback((newSettings: PluginSettings) => {
@@ -187,7 +226,7 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <FluentProvider theme={webLightTheme}>
         <div className={styles.root}>
-          <ConnectionBar source={source} targets={targets} onAbout={() => setAboutOpen(true)} />
+          <ConnectionBar source={source} targets={targets} hasEnvironmentId={!!authContext?.environmentId} onAbout={() => setAboutOpen(true)} />
           <div className={styles.tabBar}>
             <TabList
               selectedValue={activeTab}
@@ -206,24 +245,31 @@ export function App() {
               <Tab value="settings" icon={<SettingsRegular />}>
                 Platform Settings
               </Tab>
+              <Tab value="help" icon={<BookRegular />}>
+                Help
+              </Tab>
             </TabList>
           </div>
           <div className={styles.body}>
             <div className={styles.content}>
               {activeTab === 'solutions' && <SolutionsTab targets={targets} targetSolutionData={targetSolutionData}
-                pluginSettings={pluginSettings} onSettingsChange={handleSettingsChange} />}
+                pluginSettings={pluginSettings} onSettingsChange={handleSettingsChange}
+                progressItems={progressItems} progressVisible={progressVisible}
+                showRetry={showRetry} onProgressClose={() => setProgressVisible(false)} />}
               {activeTab === 'envvars' && <EnvironmentVarsTab targets={targets} targetEnvVarData={targetEnvVarData} />}
               {activeTab === 'flows' && <CloudFlowsTab targets={targets} targetFlowData={targetFlowData} />}
-              {activeTab === 'settings' && <PlatformSettingsTab targets={targets} />}
+              {activeTab === 'settings' && <PlatformSettingsTab targets={targets} targetOrgSettingsData={targetOrgSettingsData} />}
+              {activeTab === 'help' && <DocsViewer />}
             </div>
-            <ProgressPanel
-              items={progressItems}
-              visible={progressVisible}
-              showRetry={showRetry}
-            />
           </div>
         </div>
         <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+        <AlertDialog state={alertState} onClose={() => setAlertState(emptyAlert)} />
+        <ActiveImportsDialog
+          open={activeImportsOpen}
+          activeImports={activeImportsData}
+          onClose={() => setActiveImportsOpen(false)}
+        />
       </FluentProvider>
     </QueryClientProvider>
   );

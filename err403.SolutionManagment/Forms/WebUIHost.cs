@@ -29,6 +29,7 @@ namespace err403.SolutionManagment.Forms
 
         // Solutions events
         public event EventHandler<StartTransferEventArgs> StartTransferRequested;
+        public event EventHandler<ActiveImportsResponseEventArgs> ActiveImportsResponseReceived;
         public event EventHandler LoadSolutionsRequested;
         public event EventHandler<SolutionActionEventArgs> TransferSolutionsRequested;
         public event EventHandler<SolutionActionEventArgs> TransferWithSettingsRequested;
@@ -37,7 +38,7 @@ namespace err403.SolutionManagment.Forms
         public event EventHandler ImportFromFileRequested;
         public event EventHandler<SolutionActionEventArgs> RemoveFromTargetsRequested;
         public event EventHandler SwitchOrgsRequested;
-        public event EventHandler FindMissingDepsRequested;
+        public event EventHandler<SolutionActionEventArgs> FindMissingDepsRequested;
         public event EventHandler<StringEventArgs> OpenSolutionInMakerRequested;
 
         // Environment Variables events
@@ -72,6 +73,9 @@ namespace err403.SolutionManagment.Forms
         // Auth events
         public event EventHandler RefreshTokenRequested;
         public event EventHandler AuthenticateGdsRequested;
+
+        // Help pop-out
+        public event EventHandler PopOutHelpRequested;
 
         public WebUIHost()
         {
@@ -114,6 +118,7 @@ namespace err403.SolutionManagment.Forms
                 webView.CoreWebView2.NavigationCompleted += (s, e) =>
                 {
                     webViewReady = true;
+                    System.Diagnostics.Trace.WriteLine($"[WebUIHost] WebView ready, replaying {pendingScripts.Count} pending scripts");
                     while (pendingScripts.Count > 0)
                     {
                         webView.CoreWebView2.ExecuteScriptAsync(pendingScripts.Dequeue());
@@ -153,12 +158,15 @@ namespace err403.SolutionManagment.Forms
 
         private void ExecuteScript(string script)
         {
+            var preview = script.Length > 200 ? script.Substring(0, 200) + "..." : script;
+            System.Diagnostics.Trace.WriteLine($"[WebUIHost] → JS: {SanitizeTrace(preview)}");
             if (webViewReady && webView?.CoreWebView2 != null)
             {
                 webView.CoreWebView2.ExecuteScriptAsync(script);
             }
             else
             {
+                System.Diagnostics.Trace.WriteLine($"[WebUIHost] → JS (queued, webViewReady={webViewReady})");
                 pendingScripts.Enqueue(script);
             }
         }
@@ -169,6 +177,7 @@ namespace err403.SolutionManagment.Forms
             try
             {
                 var raw = e.TryGetWebMessageAsString();
+                System.Diagnostics.Trace.WriteLine($"[WebUIHost] ← JS message: {SanitizeTrace(raw?.Length > 500 ? raw.Substring(0, 500) + "..." : raw)}");
                 var msg = JsonConvert.DeserializeObject<Dictionary<string, object>>(raw);
                 if (msg == null || !msg.ContainsKey("action")) return;
 
@@ -230,6 +239,15 @@ namespace err403.SolutionManagment.Forms
                         AuthenticateGdsRequested?.Invoke(this, EventArgs.Empty);
                         break;
 
+                    case "popOutHelp":
+                        PopOutHelpRequested?.Invoke(this, EventArgs.Empty);
+                        break;
+
+                    case "logError":
+                        if (msg.ContainsKey("message"))
+                            System.Diagnostics.Trace.WriteLine($"[React] {msg["message"]}");
+                        break;
+
                     case "openUrl":
                         if (msg.ContainsKey("url"))
                         {
@@ -266,6 +284,22 @@ namespace err403.SolutionManagment.Forms
                         RaiseSolutionEvent(RemoveFromSourceRequested, msg);
                         break;
 
+                    case "activeImportsResponse":
+                        {
+                            var skipTargets = msg.ContainsKey("skipTargets")
+                                ? JsonConvert.DeserializeObject<List<string>>(msg["skipTargets"].ToString())
+                                : new List<string>();
+                            var waitTargets = msg.ContainsKey("waitTargets")
+                                ? JsonConvert.DeserializeObject<List<string>>(msg["waitTargets"].ToString())
+                                : new List<string>();
+                            ActiveImportsResponseReceived?.Invoke(this, new ActiveImportsResponseEventArgs
+                            {
+                                SkipTargets = skipTargets,
+                                WaitTargets = waitTargets
+                            });
+                        }
+                        break;
+
                     case "exportToFile":
                         RaiseSolutionEvent(ExportSolutionsRequested, msg);
                         break;
@@ -291,7 +325,7 @@ namespace err403.SolutionManagment.Forms
                         break;
 
                     case "findMissingDeps":
-                        FindMissingDepsRequested?.Invoke(this, EventArgs.Empty);
+                        RaiseSolutionEvent(FindMissingDepsRequested, msg);
                         break;
 
                     case "openSolutionInMaker":
@@ -371,8 +405,7 @@ namespace err403.SolutionManagment.Forms
 
             if (string.IsNullOrEmpty(envId))
             {
-                MessageBox.Show(this, "Environment ID not available. Click 'Power Platform Auth' first.",
-                    "Authentication Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowAlert("Authentication Required", "Environment ID not available. Click 'Power Platform Auth' first.", "warning");
                 return;
             }
 
@@ -388,8 +421,7 @@ namespace err403.SolutionManagment.Forms
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show(this, $"Could not open browser:\n{ex.Message}",
-                            "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        ShowAlert("Error", $"Could not open browser:\n{ex.Message}", "error");
                     }
                 }
             }
@@ -415,6 +447,8 @@ namespace err403.SolutionManagment.Forms
             if (flows == null || flows.Count == 0) return;
 
             var args = new FlowActivateRequestedEventArgs { Activate = activate };
+            if (msg.ContainsKey("targetName"))
+                args.TargetName = msg["targetName"]?.ToString();
             foreach (var sf in flows)
             {
                 var flowData = currentFlows.FirstOrDefault(f => f.WorkflowId == sf.WorkflowId);
@@ -443,9 +477,8 @@ namespace err403.SolutionManagment.Forms
 
                 if (selected == null || selected.Count == 0)
                 {
-                    MessageBox.Show(this,
-                        $"Select one or more cloud flows to {(activate ? "activate" : "deactivate")}.",
-                        "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ShowAlert("No Selection",
+                        $"Select one or more cloud flows to {(activate ? "activate" : "deactivate")}.", "info");
                     return;
                 }
 
@@ -473,6 +506,16 @@ namespace err403.SolutionManagment.Forms
             }
         }
 
+        // ── Public API: Alerts (replaces WinForms MessageBox) ──
+
+        public void ShowAlert(string title, string message, string severity = "info")
+        {
+            ExecuteScript($"window.bridge.showAlert(" +
+                $"{JsonConvert.SerializeObject(title)}, " +
+                $"{JsonConvert.SerializeObject(message)}, " +
+                $"{JsonConvert.SerializeObject(severity)})");
+        }
+
         // ── Public API: Progress ──
 
         public void SetProgressItems(string json)
@@ -493,6 +536,11 @@ namespace err403.SolutionManagment.Forms
         public void ShowRetryButton(bool show)
         {
             ExecuteScript($"window.bridge.showRetryButton({(show ? "true" : "false")})");
+        }
+
+        public void SendActiveImports(string json)
+        {
+            ExecuteScript($"window.bridge.activeImportsDetected({JsonConvert.SerializeObject(json)})");
         }
 
         // ── Public API: Connections ──
@@ -733,6 +781,11 @@ namespace err403.SolutionManagment.Forms
             ExecuteScript($"window.bridge.targetEnvVars?.({JsonConvert.SerializeObject(connectionName)}, {JsonConvert.SerializeObject(json)})");
         }
 
+        public void SendTargetOrgSettings(string connectionName, string json)
+        {
+            ExecuteScript($"window.bridge.targetOrgSettings?.({JsonConvert.SerializeObject(connectionName)}, {JsonConvert.SerializeObject(json)})");
+        }
+
         public void SendFlowResults(string json)
         {
             ExecuteScript($"window.bridge.flowResults?.({JsonConvert.SerializeObject(json)})");
@@ -769,6 +822,19 @@ namespace err403.SolutionManagment.Forms
         }
 
         // ── Helpers ──
+
+        private static string SanitizeTrace(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            // Redact JWT tokens (eyJ...)
+            text = System.Text.RegularExpressions.Regex.Replace(text,
+                @"eyJ[A-Za-z0-9_\-\.]{20,}", "eyJ***REDACTED***");
+            // Redact known secret env var values
+            text = System.Text.RegularExpressions.Regex.Replace(text,
+                @"(?i)(secret|password|clientsecret)["":\\]+\s*[""]*([^"",\}]{8})[^"",\}]*",
+                "$1\":\"$2***REDACTED***");
+            return text;
+        }
 
         private static string GetStatusText(int stateCode)
         {
@@ -865,6 +931,8 @@ namespace err403.SolutionManagment.Forms
         [JsonProperty("uniqueName")] public string UniqueName { get; set; }
         [JsonProperty("friendlyName")] public string FriendlyName { get; set; }
         [JsonProperty("version")] public string Version { get; set; }
+        /// <summary>Pre-computed new version from the React confirm dialog. Null means skip version update for this solution.</summary>
+        [JsonProperty("newVersion")] public string NewVersion { get; set; }
     }
 
     public class EnvVarTransferEventArgs : EventArgs
@@ -913,5 +981,11 @@ namespace err403.SolutionManagment.Forms
     {
         public List<SolutionActionItem> Solutions { get; set; } = new List<SolutionActionItem>();
         public Services.SolutionTransferService.TransferSettings Settings { get; set; }
+    }
+
+    public class ActiveImportsResponseEventArgs : EventArgs
+    {
+        public List<string> SkipTargets { get; set; } = new List<string>();
+        public List<string> WaitTargets { get; set; } = new List<string>();
     }
 }

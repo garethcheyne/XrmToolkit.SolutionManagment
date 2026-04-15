@@ -9,6 +9,7 @@ namespace err403.SolutionManagment.Forms
     {
         public List<FlowActionItem> Flows { get; set; } = new List<FlowActionItem>();
         public bool Activate { get; set; }
+        public string TargetName { get; set; }
     }
 
     public class FlowActionItem

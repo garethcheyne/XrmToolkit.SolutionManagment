@@ -1,31 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
-  InlineDrawer, DrawerHeader, DrawerHeaderTitle, DrawerBody, DrawerFooter,
   Button, Field, Textarea, Input, Badge, Text, Divider,
   makeStyles, tokens,
 } from '@fluentui/react-components';
 import {
-  DismissRegular, SaveRegular, CopyRegular,
+  SaveRegular, CopyRegular,
 } from '@fluentui/react-icons';
 import type { TargetConnection } from '../types';
 import { postMessage } from '../bridge';
+import { Panel } from '../components/Panel';
 
 const useStyles = makeStyles({
-  drawer: {
-    width: '380px',
-    minWidth: '380px',
-    borderLeft: `1px solid ${tokens.colorNeutralStroke1}`,
-    overflowY: 'auto',
-  },
-  body: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    padding: '4px 0',
-  },
   sourceSection: {
     padding: '8px',
-    backgroundColor: tokens.colorNeutralBackground3,
+    backgroundColor: tokens.colorNeutralBackground4,
     borderRadius: '6px',
     '& input, & textarea': { width: '100%' },
   },
@@ -39,14 +27,24 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: '4px',
     padding: '8px',
-    backgroundColor: tokens.colorNeutralBackground3,
+    backgroundColor: tokens.colorNeutralBackground4,
     borderRadius: '6px',
     '& input, & textarea': { width: '100%' },
   },
-  footer: {
+  targetItemDirty: {
     display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '8px',
+    flexDirection: 'column',
+    gap: '4px',
+    padding: '8px',
+    backgroundColor: tokens.colorPaletteYellowBackground1,
+    borderRadius: '6px',
+    borderLeft: `3px solid ${tokens.colorPaletteYellowBorder1}`,
+    '& input, & textarea': { width: '100%' },
+  },
+  targetHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   divider:{
     flexGrow: 0,
@@ -59,7 +57,9 @@ interface EnvVarEditPanelProps {
   variable: {
     displayName: string;
     schemaName: string;
+    description: string;
     type: string;
+    defaultValue: string;
     currentValue: string;
   } | null;
   targets: TargetConnection[];
@@ -85,69 +85,105 @@ export function EnvVarEditPanel({ open, onClose, variable, targets, targetEnvVar
 
   const isJson = variable.type === 'JSON';
 
+  // Compute original values and dirty state per target
+  const originals = useMemo(() => {
+    const map: Record<string, string> = {};
+    targets.forEach((t) => {
+      map[t.name] = targetEnvVarData[t.name]?.find((v) => v.schemaname === variable.schemaName)?.value ?? '';
+    });
+    return map;
+  }, [variable, targets, targetEnvVarData]);
+
+  const dirtyTargets = useMemo(() => {
+    const set = new Set<string>();
+    targets.forEach((t) => {
+      if ((targetValues[t.name] ?? '') !== (originals[t.name] ?? '')) {
+        set.add(t.name);
+      }
+    });
+    return set;
+  }, [targets, targetValues, originals]);
+
+  const hasDirty = dirtyTargets.size > 0;
+
   const handleCopyToAll = () => {
+    const effectiveValue = variable.currentValue || variable.defaultValue;
     const updated: Record<string, string> = {};
-    targets.forEach((t) => { updated[t.name] = variable.currentValue; });
+    targets.forEach((t) => { updated[t.name] = effectiveValue; });
     setTargetValues(updated);
   };
 
   const handleSave = () => {
+    if (!hasDirty) return;
     const changedValues: Record<string, string> = {};
-    targets.forEach((t) => {
-      const original = targetEnvVarData[t.name]?.find((v) => v.schemaname === variable.schemaName)?.value ?? '';
-      if (targetValues[t.name] !== original) {
-        changedValues[t.name] = targetValues[t.name] ?? '';
-      }
+    dirtyTargets.forEach((name) => {
+      changedValues[name] = targetValues[name] ?? '';
     });
 
-    if (Object.keys(changedValues).length > 0) {
-      postMessage({
-        action: 'saveEnvVar' as never,
-        schemaName: variable.schemaName,
-        displayName: variable.displayName,
-        changedValues,
-      } as never);
-    }
+    postMessage({
+      action: 'saveEnvVar',
+      schemaName: variable.schemaName,
+      displayName: variable.displayName,
+      changedValues,
+    });
     onClose();
   };
 
-  return (
-    <InlineDrawer open={open} position="end" className={styles.drawer}>
-      <DrawerHeader>
-        <DrawerHeaderTitle
-          action={<Button appearance="subtle" icon={<DismissRegular />} onClick={onClose} size="small" />}
-        >
-          Edit Variable
-        </DrawerHeaderTitle>
-      </DrawerHeader>
+  const footer = (
+    <>
+      <Button appearance="secondary" onClick={onClose}>Cancel</Button>
+      <Button appearance="primary" icon={<SaveRegular />} onClick={handleSave} disabled={!hasDirty}>
+        Save Changes{hasDirty ? ` (${dirtyTargets.size})` : ''}
+      </Button>
+    </>
+  );
 
-      <DrawerBody className={styles.body}>
+  return (
+    <Panel title="Edit Variable" onClose={onClose} footer={footer}>
         <Text weight="semibold">{variable.displayName}</Text>
-        <Badge size="small" appearance="tint" color="informative">{variable.type}</Badge>
+        <Badge size="small" appearance="tint" color="informative" style={{ alignSelf: 'flex-start' }}>{variable.type}</Badge>
         <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>{variable.schemaName}</Text>
 
-        <Divider />
+        {variable.description && (
+          <Text size={200} style={{ color: tokens.colorNeutralForeground2, fontStyle: 'italic' }}>{variable.description}</Text>
+        )}
 
-        <Field label="Source Value">
-          <div className={styles.sourceSection}>
-            {isJson ? (
-              <Textarea value={variable.currentValue || '(default)'} readOnly rows={4} resize="vertical" />
-            ) : (
-              <Input  value={variable.currentValue || '(default)'} readOnly />
-            )}
-          </div>
+        <Divider className={styles.divider} />
+
+        <Field label="Default Value">
+          {isJson ? (
+            <Textarea value={variable.defaultValue || '(none)'} readOnly rows={3} resize="vertical" />
+          ) : (
+            <Input value={variable.defaultValue || '(none)'} readOnly />
+          )}
+        </Field>
+        <Field label="Current Value">
+          {isJson ? (
+            <Textarea value={variable.currentValue || '(default)'} readOnly rows={3} resize="vertical" />
+          ) : (
+            <Input value={variable.currentValue || '(default)'} readOnly />
+          )}
         </Field>
 
-        <Button size="small" icon={<CopyRegular />} onClick={handleCopyToAll}>
+        <Button size="small" icon={<CopyRegular />} onClick={handleCopyToAll} style={{ alignSelf: 'flex-start' }}>
           Copy source to all targets
         </Button>
 
         <Divider className={styles.divider} />
 
         <div className={styles.targetSection}>
-          {targets.map((t) => (
-            <div key={t.name} className={styles.targetItem}>
-              <Text size={200} weight="semibold">{t.name}</Text>
+          {targets.map((t) => {
+            const isDirty = dirtyTargets.has(t.name);
+            return (
+              <div key={t.name} className={isDirty ? styles.targetItemDirty : styles.targetItem}>
+                <div className={styles.targetHeader}>
+                  <Text size={200} weight="semibold">{t.name}</Text>
+                  {isDirty && <Badge size="small" appearance="filled" color="warning">modified</Badge>}
+                </div>
+                <Field label="Current" size="small">
+                  <Input value={originals[t.name] || '(not set)'} readOnly size="small" />
+                </Field>
+                <Field label="New Value" size="small">
               {isJson ? (
                 <Textarea
                   value={targetValues[t.name] ?? ''}
@@ -161,15 +197,11 @@ export function EnvVarEditPanel({ open, onClose, variable, targets, targetEnvVar
                   onChange={(_e, d) => setTargetValues({ ...targetValues, [t.name]: d.value })}
                 />
               )}
-            </div>
-          ))}
+                </Field>
+              </div>
+            );
+          })}
         </div>
-      </DrawerBody>
-
-      <DrawerFooter className={styles.footer}>
-        <Button appearance="secondary" onClick={onClose}>Cancel</Button>
-        <Button appearance="primary" icon={<SaveRegular />} onClick={handleSave}>Save Changes</Button>
-      </DrawerFooter>
-    </InlineDrawer>
+    </Panel>
   );
 }

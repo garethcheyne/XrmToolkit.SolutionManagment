@@ -2,25 +2,31 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DataGrid, DataGridHeader, DataGridRow, DataGridHeaderCell,
   DataGridBody, DataGridCell, createTableColumn,
-  type TableColumnDefinition, type DataGridProps,
+  type TableColumnDefinition, type DataGridProps, type TableColumnSizingOptions,
   SearchBox, Text, Toolbar, ToolbarButton, ToolbarDivider,
   Badge, Menu, MenuTrigger, MenuPopover, MenuList, MenuItem,
   Tooltip, tokens, makeStyles, type SelectionItemId,
+  Popover, PopoverTrigger, PopoverSurface, Link, Button,
 } from '@fluentui/react-components';
 import {
   ArrowSyncRegular, ArrowUploadRegular, ArrowDownloadRegular,
   DeleteRegular, ArrowSwapRegular,
   SearchRegular, OpenRegular, FolderOpenRegular, SettingsRegular,
-  LockClosedFilled, LockOpenFilled,
+  LockClosedFilled, LockOpenFilled, InfoRegular,
 } from '@fluentui/react-icons';
 import { TableSkeleton } from '../components/TableSkeleton';
 import { useQuery } from '@tanstack/react-query';
 import { getSolutions } from '../dataverse';
 import { getAuth } from '../auth';
 import { postMessage, setBridgeHandler } from '../bridge';
-import { SettingsDrawer, type PluginSettings } from '../dialogs/SettingsDrawer';
+import { SettingsPanel, type PluginSettings } from '../panels/SettingsPanel';
+import { ProgressPanel, type ProgressItemData } from '../panels/ProgressPanel';
+import { Allotment } from 'allotment';
+import 'allotment/dist/style.css';
 import { TransferConfirmDialog } from '../dialogs/TransferConfirmDialog';
 import { TransferResultsDialog } from '../dialogs/TransferResultsDialog';
+import { ConfirmDialog, emptyConfirm, type ConfirmDialogState } from '../dialogs/ConfirmDialog';
+import { MissingDepsDialog, type MissingDepResult } from '../dialogs/MissingDepsDialog';
 import type { TargetConnection, TransferResult } from '../types';
 
 const useStyles = makeStyles({
@@ -35,13 +41,9 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2, flexShrink: 0,
   },
   searchBox: { flex: '1 1 auto', maxWidth: '280px', minWidth: '150px' },
-  bodyRow: {
-    display: 'flex',
-    flex: 1,
-    overflow: 'hidden',
-  },
-  gridContainer: { flex: 1, overflow: 'auto' },
+  gridContainer: { height: '100%', overflowX: 'auto', overflowY: 'auto' },
   headerCell: { fontWeight: 700, fontSize: '12px', backgroundColor: tokens.colorNeutralBackground3 },
+  cell: { overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%' },
   versionCell: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -110,6 +112,10 @@ interface SolutionsTabProps {
   targetSolutionData: Record<string, Array<{ uniquename: string; version: string; ismanaged: boolean }>>;
   pluginSettings: PluginSettings;
   onSettingsChange: (settings: PluginSettings) => void;
+  progressItems: ProgressItemData[];
+  progressVisible: boolean;
+  showRetry: boolean;
+  onProgressClose: () => void;
 }
 
 interface SolutionRow {
@@ -124,16 +130,19 @@ interface SolutionRow {
   targetVersions: Record<string, { version: string; isManaged: boolean }>;
 }
 
-export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSettingsChange }: SolutionsTabProps) {
+export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSettingsChange, progressItems, progressVisible, showRetry, onProgressClose }: SolutionsTabProps) {
   const styles = useStyles();
   const auth = getAuth();
   const [search, setSearch] = useState('');
   const [selectedItems, setSelectedItems] = useState<Set<SelectionItemId>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ solutionId: string; x: number; y: number } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(true);
   const [transferResults, setTransferResults] = useState<TransferResult[]>([]);
   const [resultsOpen, setResultsOpen] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmDialogState>(emptyConfirm);
+  const [missingDepsResults, setMissingDepsResults] = useState<MissingDepResult[]>([]);
+  const [missingDepsOpen, setMissingDepsOpen] = useState(false);
 
   useEffect(() => {
     // Receive transfer results from C#
@@ -144,6 +153,13 @@ export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSe
         setResultsOpen(true);
         return updated;
       });
+    });
+
+    // Receive missing deps check results from C#
+    setBridgeHandler('missingDeps', (json: string) => {
+      const results: MissingDepResult[] = JSON.parse(json);
+      setMissingDepsResults(results);
+      setMissingDepsOpen(true);
     });
   }, []);
 
@@ -196,6 +212,20 @@ export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSe
       s.publisher.toLowerCase().includes(lower)
     );
   }, [mergedRows, search]);
+
+  const columnSizingOptions = useMemo<TableColumnSizingOptions>(() => {
+    const opts: TableColumnSizingOptions = {
+      uniqueName:    { minWidth: 160, defaultWidth: 220 },
+      friendlyName:  { minWidth: 160, defaultWidth: 240 },
+      version:       { minWidth: 80,  defaultWidth: 90  },
+      installedOn:   { minWidth: 110, defaultWidth: 120 },
+      publisher:     { minWidth: 120, defaultWidth: 160 },
+    };
+    for (const t of targets) {
+      opts[`target_${t.name}`] = { minWidth: 120, defaultWidth: 150 };
+    }
+    return opts;
+  }, [targets]);
 
   const columns = useMemo(() => {
     const cols: TableColumnDefinition<SolutionRow>[] = [
@@ -260,7 +290,12 @@ export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSe
   }, [targets, styles]);
 
   const onSelectionChange: DataGridProps['onSelectionChange'] = useCallback(
-    (_e: unknown, data: { selectedItems: Set<SelectionItemId> }) => setSelectedItems(data.selectedItems), []);
+    (e: unknown, data: { selectedItems: Set<SelectionItemId> }) => {
+      const target = (e as React.SyntheticEvent)?.target as HTMLElement;
+      if (target?.closest('[role="checkbox"]') || target?.closest('input[type="checkbox"]')) {
+        setSelectedItems(data.selectedItems);
+      }
+    }, []);
 
   const getSelected = useCallback(() =>
     filteredRows.filter((s) => selectedItems.has(s.solutionId))
@@ -280,11 +315,52 @@ export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSe
         <ToolbarButton icon={<FolderOpenRegular />} onClick={() => postMessage({ action: 'importFromFile' })}>Import from File</ToolbarButton>
         <ToolbarDivider />
         <ToolbarButton icon={<ArrowDownloadRegular />} onClick={() => { const s = getSelected(); if (s.length) postMessage({ action: 'exportToFile', solutions: s }); }}>Export</ToolbarButton>
-        <ToolbarButton icon={<DeleteRegular />} onClick={() => { const s = getSelected(); if (s.length) postMessage({ action: 'removeFromTargets', solutions: s }); }}>Remove from Targets</ToolbarButton>
-        <ToolbarButton icon={<DeleteRegular />} onClick={() => { const s = getSelected(); if (s.length) postMessage({ action: 'removeFromSource', solutions: s }); }}>Remove from Source</ToolbarButton>
+        <ToolbarButton icon={<DeleteRegular />} onClick={() => {
+          const s = getSelected();
+          if (s.length) setConfirm({
+            open: true, title: 'Confirm Remove from Targets',
+            message: `Remove ${s.length} solution(s) from ${targets.length} target(s)?`,
+            severity: 'warning', confirmLabel: 'Remove',
+            onConfirm: () => postMessage({ action: 'removeFromTargets', solutions: s }),
+          });
+        }}>Remove from Targets</ToolbarButton>
+        <ToolbarButton icon={<DeleteRegular />} onClick={() => {
+          const s = getSelected();
+          if (s.length) setConfirm({
+            open: true, title: 'Confirm Remove from Source',
+            message: `Remove ${s.length} solution(s) from SOURCE environment? This cannot be undone.`,
+            severity: 'danger', confirmLabel: 'Remove',
+            onConfirm: () => postMessage({ action: 'removeFromSource', solutions: s }),
+          });
+        }}>Remove from Source</ToolbarButton>
         <ToolbarDivider />
         <ToolbarButton icon={<ArrowSwapRegular />} onClick={() => postMessage({ action: 'switchOrgs' })}>Switch</ToolbarButton>
-        <ToolbarButton icon={<SearchRegular />} onClick={() => postMessage({ action: 'findMissingDeps' })}>Missing Deps</ToolbarButton>
+        <ToolbarButton icon={<SearchRegular />} onClick={() => {
+          const s = getSelected();
+          if (s.length === 0) return;
+          postMessage({ action: 'findMissingDeps', solutions: s });
+        }}>Missing Deps</ToolbarButton>
+        <Popover withArrow size="small">
+          <PopoverTrigger>
+            <Button appearance="subtle" size="small" icon={<InfoRegular fontSize={13} />}
+              style={{ minWidth: 0, padding: '0 2px', alignSelf: 'center', color: tokens.colorNeutralForeground3 }}
+              aria-label="About Missing Deps" />
+          </PopoverTrigger>
+          <PopoverSurface style={{ maxWidth: '280px' }}>
+            <Text size={100} style={{ display: 'block', marginBottom: '6px' }}>
+              Select one or more solutions, then click <strong>Missing Deps</strong> to check
+              each target environment for required components that are not yet installed.
+              The import will fail if missing components are not resolved first.
+            </Text>
+            <Link
+              href="https://learn.microsoft.com/en-us/power-platform/alm/dependency-tracking-solution-components"
+              target="_blank"
+              style={{ fontSize: '11px' }}
+            >
+              Dependency tracking on MS Learn
+            </Link>
+          </PopoverSurface>
+        </Popover>
         <ToolbarDivider />
         <ToolbarButton icon={<SettingsRegular />} onClick={() => setSettingsOpen(!settingsOpen)}
           appearance={settingsOpen ? 'primary' : 'subtle'}>Settings</ToolbarButton>
@@ -317,51 +393,75 @@ export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSe
         </Badge>
       </div>
 
-      <div className={styles.bodyRow}>
-        {filteredRows.length === 0 ? (
-          <div className={styles.emptyState}>
-            <Text size={400} weight="semibold">{!auth ? 'Not connected' : 'No solutions found'}</Text>
-            <Text size={200}>{!auth ? 'Connect to a source environment first.' : 'Try adjusting your search.'}</Text>
-          </div>
-        ) : (
-          <div className={styles.gridContainer}>
-            <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="single"
-              selectedItems={selectedItems} onSelectionChange={onSelectionChange}
-              getRowId={(item) => item.solutionId} focusMode="composite" size="small" style={{ minWidth: '100%' }}>
-              <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3 }}>
-                <DataGridRow>
-                  {({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}
-                </DataGridRow>
-              </DataGridHeader>
-              <DataGridBody<SolutionRow>>
-                {({ item, rowId }) => (
-                  <DataGridRow<SolutionRow> key={rowId}
-                    onContextMenu={(e: React.MouseEvent) => { e.preventDefault(); setContextMenu({ solutionId: item.solutionId, x: e.clientX, y: e.clientY }); }}>
-                    {({ renderCell }) => <DataGridCell>{renderCell(item)}</DataGridCell>}
-                  </DataGridRow>
-                )}
-              </DataGridBody>
-            </DataGrid>
-          </div>
-        )}
-        <SettingsDrawer
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          settings={pluginSettings}
-          onSettingsChange={onSettingsChange}
-        />
-      </div>
+      <Allotment proportionalLayout={false}>
+          <Allotment.Pane>
+            {filteredRows.length === 0 ? (
+              <div className={styles.emptyState}>
+                <Text size={400} weight="semibold">{!auth ? 'Not connected' : 'No solutions found'}</Text>
+                <Text size={200}>{!auth ? 'Connect to a source environment first.' : 'Try adjusting your search.'}</Text>
+              </div>
+            ) : (
+              <div className={styles.gridContainer}>
+                <DataGrid items={filteredRows} columns={columns} sortable resizableColumns selectionMode="multiselect"
+                  selectedItems={selectedItems} onSelectionChange={onSelectionChange}
+                  getRowId={(item) => item.solutionId} focusMode="composite" size="small"
+                  columnSizingOptions={columnSizingOptions}
+                  style={{ minWidth: 'fit-content', width: '100%' }}>
+                  <DataGridHeader style={{ position: 'sticky', top: 0, zIndex: 1, backgroundColor: tokens.colorNeutralBackground3, minWidth: 'fit-content' }}>
+                    <DataGridRow>
+                      {({ renderHeaderCell }) => <DataGridHeaderCell className={styles.headerCell}>{renderHeaderCell()}</DataGridHeaderCell>}
+                    </DataGridRow>
+                  </DataGridHeader>
+                  <DataGridBody<SolutionRow>>
+                    {({ item, rowId }) => (
+                      <DataGridRow<SolutionRow> key={rowId}
+                        onContextMenu={(e: React.MouseEvent) => { e.preventDefault(); setContextMenu({ solutionId: item.solutionId, x: e.clientX, y: e.clientY }); }}>
+                        {({ renderCell }) => <DataGridCell className={styles.cell}>{renderCell(item)}</DataGridCell>}
+                      </DataGridRow>
+                    )}
+                  </DataGridBody>
+                </DataGrid>
+              </div>
+            )}
+          </Allotment.Pane>
+          {settingsOpen && (
+            <Allotment.Pane preferredSize={320} minSize={250} maxSize={500}>
+              <SettingsPanel
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                settings={pluginSettings}
+                onSettingsChange={onSettingsChange}
+                solutionNames={filteredRows.map((r) => r.uniqueName)}
+                selectedSolution={getSelected()[0]?.uniqueName}
+              />
+            </Allotment.Pane>
+          )}
+          {progressVisible && (
+            <Allotment.Pane preferredSize={340} minSize={280} maxSize={500}>
+              <ProgressPanel
+                items={progressItems}
+                visible={progressVisible}
+                showRetry={showRetry}
+                onClose={onProgressClose}
+              />
+            </Allotment.Pane>
+          )}
+        </Allotment>
 
       {contextMenu && (
         <div style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000 }}>
           <Menu open onOpenChange={() => setContextMenu(null)}>
             <MenuTrigger><span /></MenuTrigger>
             <MenuPopover><MenuList>
-              <MenuItem icon={<OpenRegular />} onClick={() => {
+              <MenuItem icon={<OpenRegular />} disabled={!auth?.environmentId} onClick={() => {
                 const envId = auth?.environmentId;
-                if (envId) postMessage({ action: 'openUrl', url: `https://make.powerapps.com/environments/${envId}/solutions/${contextMenu.solutionId}` });
+                if (envId) {
+                  postMessage({ action: 'openUrl', url: `https://make.powerapps.com/environments/${envId}/solutions/${contextMenu.solutionId}` });
+                } else {
+                  postMessage({ action: 'authenticateGds' });
+                }
                 setContextMenu(null);
-              }}>Open in Maker Portal</MenuItem>
+              }}>Open in Maker Portal{!auth?.environmentId ? ' (auth required)' : ''}</MenuItem>
             </MenuList></MenuPopover>
           </Menu>
         </div>
@@ -379,6 +479,14 @@ export function SolutionsTab({ targets, targetSolutionData, pluginSettings, onSe
         results={transferResults}
         open={resultsOpen}
         onClose={() => { setResultsOpen(false); refetch(); }}
+      />
+
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(emptyConfirm)} />
+
+      <MissingDepsDialog
+        results={missingDepsResults}
+        open={missingDepsOpen}
+        onClose={() => setMissingDepsOpen(false)}
       />
     </div>
   );
